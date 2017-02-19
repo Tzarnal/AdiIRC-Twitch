@@ -59,7 +59,16 @@ namespace TwitchAdiIRC
             //Process Message, looking for emotes.
             if (dataString.Contains("PRIVMSG ")) 
             {
-                var twitchMessage = new TwitchIrcMessage(dataString);
+                TwitchIrcMessage twitchMessage;
+
+                try
+                {
+                    twitchMessage = new TwitchIrcMessage(dataString);
+                }
+                catch (Exception)
+                {
+                    return;
+                }
 
                 if (twitchMessage.HasEmotes)
                 {                    
