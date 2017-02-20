@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.SqlTypes;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -22,7 +23,7 @@ namespace TwitchAdiIRC
         private readonly string _emoteDirectory =  Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + @"\AdiIRC\TwitchEmotes";        
         private List<string> _handledEmotes;
         private IServer _twitchServer;
-
+        
         public void Initialize()
         {
             //Register Delegates. 
@@ -71,15 +72,29 @@ namespace TwitchAdiIRC
                     return;
                 }
 
+                //Handle Emotes
                 if (twitchMessage.HasEmotes)
                 {                    
                     RegisterEmotes(twitchMessage.Emotes);
                 }
 
+                //Handle Bits
+                if (twitchMessage.Tags.ContainsKey("bits"))
+                {
+                    if (RegisterBits(twitchMessage.Tags["bits"]) )
+                    {                        
+                        var emoteName = "cheer" + twitchMessage.Tags["bits"];
+                        var bitsMessage = twitchMessage.Tags["bits"] + " bits";
+                        
+                        var notice = $":Twitch!Twitch@Twitch.tv NOTICE {twitchMessage.Channel} :{twitchMessage.UserName} {emoteName} just cheered for {bitsMessage}! {emoteName}";
+                        _twitchServer.SendFakeRaw(notice);
+                    }
+                }
+
                 return;
             }
 
-            //Pricess Message, redirect notices to proper channel tab
+            //Redirect notices to proper channel tab
             if (dataString.Contains("NOTICE "))
             {
                 //Check if its a usable notiec message
@@ -102,6 +117,7 @@ namespace TwitchAdiIRC
                 }
             }
 
+            //Handle timeout/ban messages
             if (dataString.Contains("CLEARCHAT ") )
             {
                 var clearChatRegex = @"@ban-duration=(.*?);ban-reason=(.*?);.+ :tmi.twitch.tv CLEARCHAT (#.+) :(.+)";
@@ -172,17 +188,96 @@ namespace TwitchAdiIRC
             }
         }
 
+        public bool RegisterBits(string bitCount)
+        {
+            if (string.IsNullOrEmpty(bitCount))
+                return false;
+            
+            var emoteName = "cheer" + bitCount;
+
+            if (_handledEmotes.Contains(emoteName))
+                return true;
+
+            var emoteFile = $"{_emoteDirectory}\\{emoteName}.png";
+
+            if (File.Exists(emoteFile))
+            {
+                //Actually register the emote with AdiIRC
+                var command = $"Emoticons Emoticon_{emoteName} {emoteFile}";
+                Host.SendCommand(_twitchServer, ".setoption", command);
+
+                _handledEmotes.Add(emoteName);
+                return true;
+            }
+            
+            if (DownloadBits(bitCount))
+            {
+                //Actually register the emote with AdiIRC                
+                var command = $"Emoticons Emoticon_{emoteName} {emoteFile}";
+                Host.SendCommand(_twitchServer, ".setoption", command);
+
+                _handledEmotes.Add(emoteName);
+                return true;
+            }
+
+            return false;
+        }
+
         private bool DownloadEmote(TwitchEmote emote)
         {
             var filePath = $"{_emoteDirectory}\\{emote.Id}.png";
 
             try
             {
-                WebClient wc = new WebClient();
+                WebClient wc = new WebClient();                
                 wc.DownloadFile(emote.URL, filePath);
             }
             catch (Exception)
             {                
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool DownloadBits(string bitCount)
+        {
+            var emoteName = "cheer" + bitCount;
+            var filePath = $"{_emoteDirectory}\\{emoteName}.png";
+            var color = "gray";
+
+            try
+            {
+                var ibitCount = int.Parse(bitCount);
+                if (ibitCount > 10000)
+                {
+                    color = "red";
+                }else if (ibitCount > 5000)
+                {
+                    color = "blue";
+                }else if (ibitCount > 1000)
+                {
+                    color = "green";
+                }else if (ibitCount > 100)
+                {
+                    color = "purple";
+                }
+            }
+            catch (Exception)
+            {
+                return false;                
+            }
+
+
+            var url = $"https://static-cdn.jtvnw.net/bits/light/static/{color}/1";
+
+            try
+            {
+                WebClient wc = new WebClient();
+                wc.DownloadFile(url, filePath);
+            }
+            catch (Exception)
+            {
                 return false;
             }
 
