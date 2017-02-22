@@ -11,6 +11,10 @@ Twitch @ AdiIRC aims to add improvements for using twitch chat through AdiIRC.
 * Shows timeouts/bans as they happen. But does not clear chat.
 * Cleans up the server tab spam
 
+Download
+=============
+Download the Lastest Version [here](https://github.com/Xesyto/AdiIRC-Twitch/releases/latest)
+
 Installation
 =============
 
