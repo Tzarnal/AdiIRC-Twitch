@@ -15,7 +15,7 @@ namespace TwitchAdiIRC
         public string Description => "Provides simple additional features like emotes for twitch chat integration.";
         public string Author => "Xesyto";
         public string Name => "Twitch @ AdiIRC";
-        public string Version => "1";
+        public string Version => "3";
         public string Email => "";
 
         public IPluginHost Host { get; set; }
