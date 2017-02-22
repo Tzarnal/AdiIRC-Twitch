@@ -44,7 +44,7 @@ namespace TwitchAdiIRC
                 return; //Only work on twitch.tv messages, early exit as soon as possible.
 
             //We'll need a window to send a command too later so we are grabbing the twitch server here
-            if (_twitchServer == null)
+            if (_twitchServer == null ||!_twitchServer.Network.Contains("twitch"))
             {
                 foreach (var server in ((IEnumerable<IServer>)Host.GetServers))
                 {
