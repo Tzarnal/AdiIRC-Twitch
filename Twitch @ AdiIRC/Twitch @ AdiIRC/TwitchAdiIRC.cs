@@ -44,11 +44,19 @@ namespace TwitchAdiIRC
             if (user.Nick != server.UserNick)
                 return;
 
-            var userName = channel.Name.TrimStart('#');
-            var topicData = TwitchApiTools.GetSimpleChannelInformationByName(userName);
+            try
+            {
+                var userName = channel.Name.TrimStart('#');
+                var topicData = TwitchApiTools.GetSimpleChannelInformationByName(userName);
 
-            var notice = $":userName!Twitch@Twitch.tv TOPIC {channel.Name} :{topicData}";
-            _twitchServer.SendFakeRaw(notice);            
+                var topicMessage = $":Twitch!Twitch@Twitch.tv TOPIC {channel.Name} :{topicData}";
+                _twitchServer.SendFakeRaw(topicMessage);
+            }
+            catch (Exception)
+            {
+                Host.SendCommand(_twitchServer, ".echo", "Error updating channel topic.");                
+            }
+            
         }
 
         private void MyHostOnOnRawData(object sender, RawDataArgs rawDataArgs)
