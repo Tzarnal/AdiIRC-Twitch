@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
+using System.Windows.Forms;
+using Timer = System.Threading.Timer;
 using Twitch___AdiIRC.TwitchApi;
 using AdiIRCAPI;
-using Timer = System.Threading.Timer;
+
 
 namespace TwitchAdiIRC
 {
@@ -15,7 +16,7 @@ namespace TwitchAdiIRC
         public string Description => "Provides simple additional features like emotes for twitch chat integration.";
         public string Author => "Xesyto";
         public string Name => "Twitch @ AdiIRC";
-        public string Version => "3";
+        public string Version => "3.1";
         public string Email => "";
 
         public IPluginHost Host { get; set; }
@@ -32,8 +33,8 @@ namespace TwitchAdiIRC
             Host.OnRawData += MyHostOnOnRawData;
             Host.OnJoin += HostOnOnJoin;
             _handledEmotes = new List<string>();
-            _topicTimer = new Timer(state => TopicUpdate(),true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));
-            
+            _topicTimer = new Timer(state => TopicUpdate(),true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));            
+
             if (!Directory.Exists(_emoteDirectory))
             {
                 Directory.CreateDirectory(_emoteDirectory);
@@ -44,14 +45,19 @@ namespace TwitchAdiIRC
         {
             @return = EatData.EatNone;
 
-            if (user.Nick != server.UserNick)
+            CheckTwitchServer();
+
+            if (!server.Network.ToLower().Contains("twitch"))                            
+                return;
+            
+            if (user.Nick != _twitchServer.UserNick)
                 return;
 
             try
             {
                 var userName = channel.Name.TrimStart('#');
                 var topicData = TwitchApiTools.GetSimpleChannelInformationByName(userName);
-
+                
                 var topicMessage = $":Twitch!Twitch@Twitch.tv TOPIC {channel.Name} :{topicData}";
                 _twitchServer.SendFakeRaw(topicMessage);
             }
@@ -64,26 +70,11 @@ namespace TwitchAdiIRC
 
         private void MyHostOnOnRawData(object sender, RawDataArgs rawDataArgs)
         {
+            if (CheckTwitchServer() == false)
+                return;
+
             var dataString = System.Text.Encoding.UTF8.GetString(rawDataArgs.Bytes);
-
-            if (!dataString.Contains("twitch.tv") || string.IsNullOrEmpty(dataString))
-                return; //Only work on twitch.tv messages, early exit as soon as possible.
-
-            //We'll need a window to send a command too later so we are grabbing the twitch server here
-            if (_twitchServer == null ||!_twitchServer.Network.Contains("twitch"))
-            {
-                foreach (var server in ((IEnumerable<IServer>)Host.GetServers))
-                {
-                    if (server.Network.Contains("twitch"))
-                    {
-                        _twitchServer = server;
-                    }
-                }
-                //If that did not work grab the first.               
-                if (_twitchServer == null)
-                    _twitchServer = ((IEnumerable<IServer>) Host.GetServers).First();
-            }
-
+            
             //Process Message, looking for emotes.
             if (dataString.Contains("PRIVMSG ")) 
             {
@@ -180,30 +171,29 @@ namespace TwitchAdiIRC
 
         private void TopicUpdate()
         {
-            if (_twitchServer == null)
+            if (CheckTwitchServer() == false)
                 return;
 
             var channels = _twitchServer.GetChannels;
-            var channelNames = new List<string>();
+            
             foreach (IChannel channel in channels)
-            {
-                channelNames.Add(channel.Name.TrimStart('#'));
-            }
-
-            try
-            {
-                var topics = TwitchApiTools.GetSimpleChannelInformationByNames(channelNames);
-
-                foreach (var topic in topics)
+            {                
+                try
                 {
-                    var topicMessage = $":Twitch!Twitch@Twitch.tv TOPIC #{topic.Key} :{topic.Value}";
-                    _twitchServer.SendFakeRaw(topicMessage);
+                    var channelName = channel.Name.TrimStart('#');
+                    var newTopic = TwitchApiTools.GetSimpleChannelInformationByName(channelName);
+                    if (channel.Topic != newTopic)
+                    {
+                        var topicMessage = $":Twitch!Twitch@Twitch.tv TOPIC #{channelName} :{newTopic}";
+                        _twitchServer.SendFakeRaw(topicMessage);
+                    }
+                }
+                catch (Exception)
+                {
+                    Host.SendCommand(_twitchServer, ".echo", "Error updating channel topics.");
+                    return;
                 }
             }
-            catch (Exception)
-            {
-                Host.SendCommand(_twitchServer, ".echo", "Error updating channel topics.");
-            }            
         }
 
         public void RegisterEmote(TwitchEmote emote)
@@ -274,6 +264,27 @@ namespace TwitchAdiIRC
                 return true;
             }
 
+            return false;
+        }
+
+        private bool CheckTwitchServer()
+        {
+            if (_twitchServer != null)
+            {
+                if (_twitchServer.Network.ToLower().Contains("twitch"))
+                {                    
+                    return true;
+                }
+            }
+
+            foreach (var server in ((IEnumerable<IServer>)Host.GetServers))
+            {
+                if (server.Network.ToLower().Contains("twitch"))
+                {
+                    _twitchServer = server;
+                    return true;
+                }
+            }
             return false;
         }
 
