@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data.SqlTypes;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
+using Twitch___AdiIRC.TwitchApi;
 using AdiIRCAPI;
 
 namespace TwitchAdiIRC
@@ -28,12 +28,27 @@ namespace TwitchAdiIRC
         {
             //Register Delegates. 
             Host.OnRawData += MyHostOnOnRawData;
+            Host.OnJoin += HostOnOnJoin;
             _handledEmotes = new List<string>();
 
             if (!Directory.Exists(_emoteDirectory))
             {
                 Directory.CreateDirectory(_emoteDirectory);
             }
+        }
+
+        private void HostOnOnJoin(IServer server, IChannel channel, IUser user, out EatData @return)
+        {
+            @return = EatData.EatNone;
+
+            if (user.Nick != server.UserNick)
+                return;
+
+            var userName = channel.Name.TrimStart('#');
+            var topicData = TwitchApiTools.GetSimpleChannelInformationByName(userName);
+
+            var notice = $":userName!Twitch@Twitch.tv TOPIC {channel.Name} :{topicData}";
+            _twitchServer.SendFakeRaw(notice);            
         }
 
         private void MyHostOnOnRawData(object sender, RawDataArgs rawDataArgs)
