@@ -6,6 +6,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using Twitch___AdiIRC.TwitchApi;
 using AdiIRCAPI;
+using Timer = System.Threading.Timer;
 
 namespace TwitchAdiIRC
 {
@@ -23,14 +24,16 @@ namespace TwitchAdiIRC
         private readonly string _emoteDirectory =  Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + @"\AdiIRC\TwitchEmotes";        
         private List<string> _handledEmotes;
         private IServer _twitchServer;
-        
+        private Timer _topicTimer;
+
         public void Initialize()
         {
             //Register Delegates. 
             Host.OnRawData += MyHostOnOnRawData;
             Host.OnJoin += HostOnOnJoin;
             _handledEmotes = new List<string>();
-
+            _topicTimer = new Timer(state => TopicUpdate(),true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));
+            
             if (!Directory.Exists(_emoteDirectory))
             {
                 Directory.CreateDirectory(_emoteDirectory);
@@ -173,6 +176,34 @@ namespace TwitchAdiIRC
                 //Silently eat these messages and do nothing. They only cause empty * lines to appear in the server tab and Twitch@AdiIRC does not use them
                 rawDataArgs.Bytes = null;
             }                                    
+        }
+
+        private void TopicUpdate()
+        {
+            if (_twitchServer == null)
+                return;
+
+            var channels = _twitchServer.GetChannels;
+            var channelNames = new List<string>();
+            foreach (IChannel channel in channels)
+            {
+                channelNames.Add(channel.Name.TrimStart('#'));
+            }
+
+            try
+            {
+                var topics = TwitchApiTools.GetSimpleChannelInformationByNames(channelNames);
+
+                foreach (var topic in topics)
+                {
+                    var topicMessage = $":Twitch!Twitch@Twitch.tv TOPIC #{topic.Key} :{topic.Value}";
+                    _twitchServer.SendFakeRaw(topicMessage);
+                }
+            }
+            catch (Exception)
+            {
+                Host.SendCommand(_twitchServer, ".echo", "Error updating channel topics.");
+            }            
         }
 
         public void RegisterEmote(TwitchEmote emote)
