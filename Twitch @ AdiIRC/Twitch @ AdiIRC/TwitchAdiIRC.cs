@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Text.RegularExpressions;
-using System.Windows.Forms;
 using Timer = System.Threading.Timer;
 using Twitch___AdiIRC.TwitchApi;
 using AdiIRCAPI;
+using Twitch___AdiIRC;
 
 
 namespace TwitchAdiIRC
@@ -22,23 +22,48 @@ namespace TwitchAdiIRC
         public IPluginHost Host { get; set; }
         public ITools Tools { get; set; }
         
-        private readonly string _emoteDirectory =  Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + @"\AdiIRC\TwitchEmotes";        
+        private readonly string _emoteDirectory =  Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + @"\AdiIRC\TwitchEmotes";
+        private Timer _topicTimer;
+
         private List<string> _handledEmotes;
         private IServer _twitchServer;
-        private Timer _topicTimer;
+        private Settings _settings;        
+        private SettingsForm _settingsForm;
 
         public void Initialize()
         {
             //Register Delegates. 
             Host.OnRawData += MyHostOnOnRawData;
             Host.OnJoin += HostOnOnJoin;
+            Host.OnCommand += HostOnOnCommand;
+
             _handledEmotes = new List<string>();
-            _topicTimer = new Timer(state => TopicUpdate(),true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));            
+            _topicTimer = new Timer(state => TopicUpdate(),true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));
+
+            if (File.Exists(Settings.FullPath))
+            {
+                _settings = Settings.Load();
+            }
+            else
+            {
+                _settings = new Settings();
+            }
+
+            _settingsForm = new SettingsForm(_settings);
+
+            Host.HookCommand(this, "/twitch@", "configure twitch @ adiirc",
+                "show a window that lets you change twitch # adiirc settings");
+            
 
             if (!Directory.Exists(_emoteDirectory))
             {
                 Directory.CreateDirectory(_emoteDirectory);
             }
+        }
+
+        private void HostOnOnCommand(object window, string command, string args)
+        {            
+            _settingsForm.Show();            
         }
 
         private void HostOnOnJoin(IServer server, IChannel channel, IUser user, out EatData @return)
@@ -96,7 +121,7 @@ namespace TwitchAdiIRC
                 }
 
                 //Handle Bits
-                if (twitchMessage.Tags.ContainsKey("bits"))
+                if (_settings.ShowCheers && twitchMessage.Tags.ContainsKey("bits"))
                 {
                     if (RegisterBits(twitchMessage.Tags["bits"]) )
                     {                        
@@ -135,7 +160,7 @@ namespace TwitchAdiIRC
             }
 
             //Handle timeout/ban messages
-            if (dataString.Contains("CLEARCHAT ") )
+            if (_settings.ShowTimeouts && dataString.Contains("CLEARCHAT ") )
             {
                 var clearChatRegex = @"@ban-duration=(.*?);ban-reason=(.*?);.+ :tmi.twitch.tv CLEARCHAT (#.+) :(.+)";
                 var clearChatMatch = Regex.Match(dataString, clearChatRegex);
@@ -350,7 +375,8 @@ namespace TwitchAdiIRC
         }
 
         public void Dispose()
-        {        
+        {
+            _settings.Save();        
         }        
     }
 }
