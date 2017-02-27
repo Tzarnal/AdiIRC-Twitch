@@ -180,6 +180,8 @@ namespace TwitchAdiIRC
             //Handle timeout/ban messages
             if (dataString.Contains("CLEARCHAT ") )
             {
+                rawDataArgs.Bytes = null;
+
                 if (!_settings.ShowTimeouts)
                     return;
 
@@ -202,8 +204,6 @@ namespace TwitchAdiIRC
                     var notice = $":Twitch!Twitch@Twitch.tv NOTICE {channel} :{target} was banned: {message} [{time} seconds]";
                     _twitchServer.SendFakeRaw(notice);
 
-                    //Eat message.
-                    rawDataArgs.Bytes = null;
                     return;
                 }                
             }
