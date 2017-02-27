@@ -16,7 +16,14 @@ Twitch @ AdiIRC aims to add improvements for using twitch chat through AdiIRC.
 Usage
 =============
 Download and install properly, connect to twitch chat, thats it, it should be working. 
+
 A very basic set of configuation options can be accessed through the '/twitch@' command.
+
+Commands
+=============
+As noted on the twitch Irc Guide:
+
+Most normal chat commands like /timeout, /ban, /clear are sent with periods in place of the forward slash. For example, to ban the user "xangold", you would send ".ban xangold" to the server (minus the quotes). Programs like mIRC will not work with unknown / commands (which is why you use a period.)
 
 Download
 =============
