@@ -30,6 +30,7 @@ namespace TwitchAdiIRC
         private Settings _settings;        
         private SettingsForm _settingsForm;
 
+
         public void Initialize()
         {
             //Register Delegates. 
@@ -99,10 +100,27 @@ namespace TwitchAdiIRC
                 return;
 
             var dataString = System.Text.Encoding.UTF8.GetString(rawDataArgs.Bytes);
-            
-            //Process Message, looking for emotes.
+
+            //Process Message
             if (dataString.Contains("PRIVMSG ")) 
             {
+                //Handle Subscriptions ( not resubs, also prime subs )
+                var primeRegex = @"twitchnotify!twitchnotify@twitchnotify.tmi.twitch.tv PRIVMSG (#\S+) :(.*subscribed.*)";
+                var primeMatch = Regex.Match(dataString, primeRegex);
+
+                if (_settings.ShowSubs && primeMatch.Success)
+                {
+                    var channel = primeMatch.Groups[1].ToString();
+                    var message = primeMatch.Groups[2].ToString();
+
+                    var notice = $":Twitch!Twitch@Twitch.tv NOTICE {channel} :{message}";
+                    _twitchServer.SendFakeRaw(notice);
+
+                    rawDataArgs.Bytes = null;
+                    return;
+                }
+
+
                 TwitchIrcMessage twitchMessage;
 
                 try
@@ -160,8 +178,11 @@ namespace TwitchAdiIRC
             }
 
             //Handle timeout/ban messages
-            if (_settings.ShowTimeouts && dataString.Contains("CLEARCHAT ") )
+            if (dataString.Contains("CLEARCHAT ") )
             {
+                if (!_settings.ShowTimeouts)
+                    return;
+
                 var clearChatRegex = @"@ban-duration=(.*?);ban-reason=(.*?);.+ :tmi.twitch.tv CLEARCHAT (#.+) :(.+)";
                 var clearChatMatch = Regex.Match(dataString, clearChatRegex);
 
@@ -187,7 +208,43 @@ namespace TwitchAdiIRC
                 }                
             }
 
-            if (dataString.Contains("ROOMSTATE ") || dataString.Contains("USERSTATE ") || dataString.Contains("USERNOTICE "))
+            //Handle resubscriptions
+            if (dataString.Contains("USERNOTICE "))
+            {
+                rawDataArgs.Bytes = null;
+
+                if (!_settings.ShowSubs)
+                    return;
+
+                var subRegexMessage = @"system-msg=(.*?);.*USERNOTICE (#.+) :(.*)";
+                var subRegexNoMessage = @"system-msg=(.*?);.*USERNOTICE (#.+)";
+
+                var subMessageMatch = Regex.Match(dataString, subRegexMessage);
+                var subNoMessageMatch = Regex.Match(dataString, subRegexNoMessage);
+                
+                if (subMessageMatch.Success)
+                {
+                    var channel = subMessageMatch.Groups[2].ToString();
+                    var systemMessage = subMessageMatch.Groups[1].ToString();
+                    var userMessage = subMessageMatch.Groups[3].ToString();
+
+                    systemMessage = systemMessage.Replace("\\s", " ");
+
+                    var notice = $":Twitch!Twitch@Twitch.tv NOTICE {channel} :{systemMessage} [{userMessage}]";
+                    _twitchServer.SendFakeRaw(notice);
+                }else if (subNoMessageMatch.Success)
+                {
+                    var channel = subMessageMatch.Groups[2].ToString();
+                    var systemMessage = subMessageMatch.Groups[1].ToString();
+
+                    systemMessage = systemMessage.Replace("\\s", " ");
+
+                    var notice = $":Twitch!Twitch@Twitch.tv NOTICE {channel} :{systemMessage}";
+                    _twitchServer.SendFakeRaw(notice);
+                }
+            }
+
+            if (dataString.Contains("ROOMSTATE ") || dataString.Contains("USERSTATE ") || dataString.Contains("CLEARCHAT "))
             {
                 //Silently eat these messages and do nothing. They only cause empty * lines to appear in the server tab and Twitch@AdiIRC does not use them
                 rawDataArgs.Bytes = null;
