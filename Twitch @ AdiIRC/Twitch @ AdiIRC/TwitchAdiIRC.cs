@@ -8,7 +8,6 @@ using Twitch___AdiIRC.TwitchApi;
 using AdiIRCAPI;
 using Twitch___AdiIRC;
 
-
 namespace TwitchAdiIRC
 {
     public class TwitchAdiIrc : IPlugin
@@ -244,7 +243,7 @@ namespace TwitchAdiIRC
                 }
             }
 
-            if (dataString.Contains("ROOMSTATE ") || dataString.Contains("USERSTATE ") || dataString.Contains("CLEARCHAT "))
+            if (dataString.Contains("ROOMSTATE ") || dataString.Contains("USERSTATE ") || dataString.Contains("CLEARCHAT ") || dataString.Contains("HOSTTARGET "))
             {
                 //Silently eat these messages and do nothing. They only cause empty * lines to appear in the server tab and Twitch@AdiIRC does not use them
                 rawDataArgs.Bytes = null;
