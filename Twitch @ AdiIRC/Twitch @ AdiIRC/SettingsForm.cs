@@ -16,6 +16,7 @@ namespace Twitch___AdiIRC
             settingsBox.Items.Add("Show Timeouts/Bans", _settings.ShowTimeouts);
             settingsBox.Items.Add("Show Cheers", _settings.ShowCheers);
             settingsBox.Items.Add("Show (Re)Subscription Notification",_settings.ShowSubs);
+            settingsBox.Items.Add("Show Badges", _settings.ShowBadges);
         }
 
         private void UpdateSettingsFromSettingsBox()
@@ -37,12 +38,12 @@ namespace Twitch___AdiIRC
                     case "Show (Re)Subscription Notification":
                         _settings.ShowSubs = settingsBox.GetItemChecked(i);
                         break;
+
+                    case "Show Badges":
+                        _settings.ShowBadges = settingsBox.GetItemChecked(i);
+                        break;
                 }
 
-                switch (WindowState)
-                {
-                        
-                }
             }
         }
 

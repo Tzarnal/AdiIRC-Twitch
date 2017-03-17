@@ -10,7 +10,9 @@ namespace TwitchAdiIRC
         public string Channel;
         public string UserName;
         public string UserMask;
+        public string BadgeList;
         public bool HasEmotes;
+        public bool HasBadges;
         public Dictionary<string, string> Tags;
         public List<TwitchEmote> Emotes;
 
@@ -47,6 +49,8 @@ namespace TwitchAdiIRC
             {
                 HasEmotes = false;
             }
+
+            ExtractBadges();
         }
 
         private Dictionary<string, string> ParseTagsString(string tagsString)
@@ -67,6 +71,59 @@ namespace TwitchAdiIRC
                 }
             }
             return tags;
+        }
+
+        private void ExtractBadges()
+        {
+            if (!Tags.ContainsKey("badges"))
+            {
+                HasBadges = false;
+                return;
+            }
+
+            var badges = Tags["badges"];
+
+            if (badges.Contains("broadcaster/1"))
+            {
+                BadgeList += "📺";
+            }
+
+            if (badges.Contains("staff/1"))
+            {
+                BadgeList += "🔧";
+            }
+
+            if (badges.Contains("admin/1"))
+            {
+                BadgeList += "🛡️";
+            }
+
+            if (badges.Contains("global_mod/1"))
+            {
+                BadgeList += "⚔️";
+            }
+
+            if (badges.Contains("moderator/1"))
+            {
+                BadgeList += "🗡️";
+            }
+
+            if (badges.Contains("subscriber/"))
+            {
+                BadgeList += "⭐";
+            }
+
+            if (badges.Contains("turbo/1"))
+            {
+                BadgeList += "⚡";
+            }
+
+            if (badges.Contains("prime/1"))
+            {
+                BadgeList += "👑";
+            }
+
+            HasBadges = !string.IsNullOrWhiteSpace(BadgeList);
         }
 
         private void ExtractEmotes()

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Text.RegularExpressions;
+using System.Windows.Forms;
 using Timer = System.Threading.Timer;
 using Twitch___AdiIRC.TwitchApi;
 using AdiIRCAPI;
@@ -15,7 +16,7 @@ namespace TwitchAdiIRC
         public string Description => "Provides simple additional features like emotes for twitch chat integration.";
         public string Author => "Xesyto";
         public string Name => "Twitch @ AdiIRC";
-        public string Version => "4";
+        public string Version => "5";
         public string Email => "";
 
         public IPluginHost Host { get; set; }
@@ -150,6 +151,18 @@ namespace TwitchAdiIRC
                     }
                 }
 
+
+                //Rewrite nicknames to include badges
+                if (_settings.ShowBadges && twitchMessage.HasBadges)
+                {
+                    //eat the message 
+                    rawDataArgs.Bytes = null;
+
+                    var newName = twitchMessage.BadgeList + twitchMessage.UserName ;
+                    dataString = dataString.Replace($":{twitchMessage.UserName}!", $":{newName}!");
+
+                    _twitchServer.SendFakeRaw(dataString);
+                }                
                 return;
             }
 

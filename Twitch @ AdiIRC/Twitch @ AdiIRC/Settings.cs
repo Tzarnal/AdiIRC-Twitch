@@ -13,6 +13,7 @@ namespace Twitch___AdiIRC
         public bool ShowTimeouts=true;
         public bool ShowCheers=true;
         public bool ShowSubs=true;
+        public bool ShowBadges=true;
         
         public static string FullPath
         {
