@@ -11,6 +11,7 @@ Twitch @ AdiIRC aims to add improvements for using twitch chat through AdiIRC.
 * Displays channels state changes such as slow mode, subscriber mode etc properly in channels
 * Shows timeouts/bans as they happen. But does not clear chat.
 * Shows Subscriptions, Resubscriptions, Prime Subscriptions, etc.
+* Shows Twitch Badges such as Broadcaster, Moderator, Subscriber etc as part of irc Username.
 * Cleans up the server tab spam
 
 Usage
