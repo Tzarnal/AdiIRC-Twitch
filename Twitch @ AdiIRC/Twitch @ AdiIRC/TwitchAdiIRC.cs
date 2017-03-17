@@ -213,7 +213,7 @@ namespace TwitchAdiIRC
                     if (string.IsNullOrEmpty(message))
                         message = "No Reason Given";
 
-                    var notice = $":Twitch!Twitch@Twitch.tv NOTICE {channel} :{target} was banned: {message} [{time} seconds]";
+                    var notice = $":Twitch!Twitch@Twitch.tv NOTICE {channel} :{target} was banned: {message} [ {time} seconds ]";
                     _twitchServer.SendFakeRaw(notice);
 
                     return;
@@ -242,7 +242,7 @@ namespace TwitchAdiIRC
 
                     systemMessage = systemMessage.Replace("\\s", " ");
 
-                    var notice = $":Twitch!Twitch@Twitch.tv NOTICE {channel} :{systemMessage} [{userMessage}]";
+                    var notice = $":Twitch!Twitch@Twitch.tv NOTICE {channel} :{systemMessage} [ {userMessage} ]";
                     _twitchServer.SendFakeRaw(notice);
                 }else if (subNoMessageMatch.Success)
                 {
