@@ -65,7 +65,7 @@ namespace TwitchAdiIRC
 
         private void HostOnOnMenu(IServer server, object window, MenuType menuType, string text, ToolStripItemCollection menuItems)
         {
-            if (!server.Network.ToLower().Contains("twitch"))
+            if (!server.Network.ToLower().Contains("twitch") || !string.IsNullOrWhiteSpace(text))
             {
                 return;
             }
