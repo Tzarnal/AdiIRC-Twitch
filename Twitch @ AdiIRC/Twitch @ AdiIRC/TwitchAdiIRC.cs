@@ -37,6 +37,7 @@ namespace TwitchAdiIRC
             Host.OnRawData += MyHostOnOnRawData;
             Host.OnJoin += HostOnOnJoin;
             Host.OnCommand += HostOnOnCommand;
+            Host.OnMenu += HostOnOnMenu;
 
             _handledEmotes = new List<string>();
             _topicTimer = new Timer(state => TopicUpdate(),true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));
@@ -62,9 +63,25 @@ namespace TwitchAdiIRC
             }
         }
 
+        private void HostOnOnMenu(IServer server, object window, MenuType menuType, string text, ToolStripItemCollection menuItems)
+        {
+            if (!server.Network.ToLower().Contains("twitch"))
+            {
+                return;
+            }
+
+            var toolStripMenuItem = new ToolStripMenuItem("Twitch@AdiIRC");
+            toolStripMenuItem.Click += delegate (object sender, EventArgs args) {
+                _settingsForm.Show();
+            };
+
+            menuItems.Add(new ToolStripSeparator());
+            menuItems.Add(toolStripMenuItem);
+        }
+
         private void HostOnOnCommand(object window, string command, string args)
-        {            
-            _settingsForm.Show();            
+        {
+            _settingsForm.Show();
         }
 
         private void HostOnOnJoin(IServer server, IChannel channel, IUser user, out EatData @return)
