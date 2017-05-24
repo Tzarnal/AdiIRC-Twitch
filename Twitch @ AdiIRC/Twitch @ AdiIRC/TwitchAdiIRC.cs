@@ -38,6 +38,7 @@ namespace TwitchAdiIRC
             Host.OnJoin += HostOnOnJoin;
             Host.OnCommand += HostOnOnCommand;
             Host.OnMenu += HostOnOnMenu;
+            Host.OnEditboxKeyDown += HostOnOnEditboxKeyDown;
 
             _handledEmotes = new List<string>();
             _topicTimer = new Timer(state => TopicUpdate(),true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));
@@ -61,6 +62,84 @@ namespace TwitchAdiIRC
             {
                 Directory.CreateDirectory(_emoteDirectory);
             }
+        }
+
+        private void HostOnOnEditboxKeyDown(IServer server, object window, IEditbox editbox, KeyEventArgs keyPressEventArgs)
+        {            
+            //Only edit the tab complete behaviour on a twitch server
+            if (!server.Network.ToLower().Contains("twitch"))
+            {
+                return;
+            }
+
+            //early exit if its not a tab key 
+            if (keyPressEventArgs.KeyCode != Keys.Tab)
+            {
+                return;
+            }
+
+            var i = editbox.SelectionStart;
+            var wordEnd = i;
+            var text = editbox.Text;
+
+            //Don't do work on an empty string
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return;
+            }
+
+            //Adjust backwards one due to how cursor position works.
+            i--;
+            if (i < 0)
+            {
+                i = 0;
+            }
+
+            //Search backwrds to find the end of the current word.
+            while (text[i] != ' ' && i > 0)
+            {
+                i--;                
+            }
+           
+            //Offset one if its not the start of the text, don't want to include teh spaces we searched for
+            if (i != 0)
+            {
+                i++;
+            }
+
+            //substring to get a word           
+            var word = text.Substring(i, wordEnd-i);
+            
+            var isValidName = false;
+
+            //See if the word is a valid nickname. Can't check what channel we're in so go for all of the channels we've joined.
+            foreach (IChannel channel in server.GetChannels)
+            {                
+                foreach (IUser user in channel.GetUsers)
+                {
+                    if (user.Nick == word)
+                    {
+                        isValidName = true;
+                        break;
+                    }
+                }
+
+                if (isValidName)
+                {
+                    break;
+                }
+            }
+
+            //exit early if we don't need to edit the textbox.
+            if (!isValidName)
+            {                
+                return;
+            }
+
+            //Insert @
+            editbox.Text = text.Insert(i, "@");
+            //Fix the cursor position.
+            editbox.SelectionStart = wordEnd+1;            
         }
 
         private void HostOnOnMenu(IServer server, object window, MenuType menuType, string text, ToolStripItemCollection menuItems)
