@@ -80,7 +80,14 @@ namespace TwitchAdiIRC
             {
                 return;
             }
-            
+
+            //Check if we're operating in a channel window, otherwise exit.
+            var channel = window as IChannel;
+            if (channel == null)
+            {
+                return;
+            }
+
             var i = editbox.SelectionStart;
             var wordEnd = i;
             var text = editbox.Text;            
@@ -111,24 +118,15 @@ namespace TwitchAdiIRC
             }
 
             //substring to get a word           
-            var word = text.Substring(i, wordEnd-i);
-            
+            var word = text.Substring(i, wordEnd-i);            
             var isValidName = false;
-
-            //See if the word is a valid nickname. Can't check what channel we're in so go for all of the channels we've joined.
-            foreach (IChannel channel in server.GetChannels)
+            
+            //See if the word is a valid nickname. 
+            foreach (IUser user in server.FindChannel(channel.Name).GetUsers)
             {                
-                foreach (IUser user in channel.GetUsers)
+                if (user.Nick == word)
                 {
-                    if (user.Nick == word)
-                    {
-                        isValidName = true;
-                        break;
-                    }
-                }
-
-                if (isValidName)
-                {
+                    isValidName = true;
                     break;
                 }
             }
