@@ -105,6 +105,20 @@ namespace TwitchAdiIRC
                 i = 0;
             }
 
+            //If the text behind the cusor matches autocomplete inserted text, set i back by that much
+            var iOffset = i - FirstWordSuffix.Length;
+            if (iOffset > 0)
+            {
+                var subString = text.Substring(iOffset+1, FirstWordSuffix.Length);
+                            
+                //Adjust backwards the length of the suffix
+                if (subString == FirstWordSuffix)
+                {                    
+                    i = iOffset;
+                    wordEnd -= FirstWordSuffix.Length;
+                }                
+            }
+
             //Search backwrds to find the end of the current word.
             while (text[i] != ' ' && i > 0)
             {
@@ -137,10 +151,15 @@ namespace TwitchAdiIRC
                 return;
             }
 
+            //Supress further actions
+            keyPressEventArgs.SuppressKeyPress = true;
+
+            //Remember old selectionstart, changing text resets it.
+            var oldSelectionSTart = editbox.SelectionStart;
             //Insert @
             editbox.Text = text.Insert(i, "@");
             //Fix the cursor position.
-            editbox.SelectionStart = wordEnd+1;            
+            editbox.SelectionStart = oldSelectionSTart + 1;
         }
 
         private void HostOnOnMenu(IServer server, object window, MenuType menuType, string text, ToolStripItemCollection menuItems)
