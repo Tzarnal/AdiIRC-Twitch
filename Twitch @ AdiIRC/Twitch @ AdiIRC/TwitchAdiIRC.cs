@@ -503,6 +503,8 @@ namespace TwitchAdiIRC
             if (suffixMatch.Success)
             {
                 FirstWordSuffix = suffixMatch.Groups[1].ToString();
+                FirstWordSuffix = FirstWordSuffix.Replace("\n", "");
+                FirstWordSuffix = FirstWordSuffix.Replace("\r", "");
             }
         }
 
