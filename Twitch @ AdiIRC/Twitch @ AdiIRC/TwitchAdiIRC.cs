@@ -30,6 +30,7 @@ namespace TwitchAdiIRC
         private Settings _settings;        
         private SettingsForm _settingsForm;
 
+        private string FirstWordSuffix = ",";
 
         public void Initialize()
         {
@@ -62,6 +63,8 @@ namespace TwitchAdiIRC
             {
                 Directory.CreateDirectory(_emoteDirectory);
             }
+
+            ReadConfig();
         }
 
         private void HostOnOnEditboxKeyDown(IServer server, object window, IEditbox editbox, KeyEventArgs keyPressEventArgs)
@@ -77,11 +80,11 @@ namespace TwitchAdiIRC
             {
                 return;
             }
-
+            
             var i = editbox.SelectionStart;
             var wordEnd = i;
-            var text = editbox.Text;
-
+            var text = editbox.Text;            
+            
             //Don't do work on an empty string
             if (string.IsNullOrWhiteSpace(text))
             {
@@ -476,6 +479,31 @@ namespace TwitchAdiIRC
                 }
             }
             return false;
+        }
+
+        private void ReadConfig()
+        {
+            var configFilePath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + @"\AdiIRC\config.ini";
+
+            string configFile;
+
+            try
+            {
+                configFile = File.ReadAllText(configFilePath);
+            }
+            catch (Exception)
+            {
+                return;
+            }
+
+            var firstWordSuffixRegex = @"FirstWordSuffix=(.*)";
+
+            var suffixMatch = Regex.Match(configFile, firstWordSuffixRegex);
+
+            if (suffixMatch.Success)
+            {
+                FirstWordSuffix = suffixMatch.Groups[1].ToString();
+            }
         }
 
         private bool DownloadEmote(TwitchEmote emote)
