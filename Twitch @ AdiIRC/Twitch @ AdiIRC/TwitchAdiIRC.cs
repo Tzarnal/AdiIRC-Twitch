@@ -185,7 +185,7 @@ namespace TwitchAdiIRC
             }
             catch (Exception)
             {
-                Host.SendCommand(_twitchServer, ".echo", "Error updating channel topic.");                
+                Host.SendCommand(_twitchServer, ".echo", "Error Error updating channel topic.");                
             }
             
         }
