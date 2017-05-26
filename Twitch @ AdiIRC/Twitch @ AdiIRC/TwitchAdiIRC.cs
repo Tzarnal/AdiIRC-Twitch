@@ -70,8 +70,8 @@ namespace TwitchAdiIRC
 
         private void HostOnOnEditboxKeyDown(IServer server, object window, IEditbox editbox, KeyEventArgs keyPressEventArgs)
         {            
-            //Only edit the tab complete behaviour on a twitch server
-            if (!server.Network.ToLower().Contains("twitch"))
+            //Only edit the tab complete behaviour on a twitch server and when the options is selected.
+            if (!server.Network.ToLower().Contains("twitch") || !_settings.AutoComplete)
             {
                 return;
             }

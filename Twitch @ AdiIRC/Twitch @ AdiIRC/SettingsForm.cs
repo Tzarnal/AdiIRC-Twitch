@@ -17,6 +17,7 @@ namespace Twitch___AdiIRC
             settingsBox.Items.Add("Show Cheers", _settings.ShowCheers);
             settingsBox.Items.Add("Show (Re)Subscription Notification",_settings.ShowSubs);
             settingsBox.Items.Add("Show Badges", _settings.ShowBadges);
+            settingsBox.Items.Add("Tab Inserts @ Before Names", _settings.AutoComplete);
         }
 
         private void UpdateSettingsFromSettingsBox()
@@ -41,6 +42,10 @@ namespace Twitch___AdiIRC
 
                     case "Show Badges":
                         _settings.ShowBadges = settingsBox.GetItemChecked(i);
+                        break;
+
+                    case "Tab Inserts @ Before Names":
+                        _settings.AutoComplete = settingsBox.GetItemChecked(i);
                         break;
                 }
 
