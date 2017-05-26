@@ -40,6 +40,7 @@ namespace TwitchAdiIRC
             Host.OnCommand += HostOnOnCommand;
             Host.OnMenu += HostOnOnMenu;
             Host.OnEditboxKeyDown += HostOnOnEditboxKeyDown;
+            Host.OnOptionsChanged += delegate { ReadConfig(); };
 
             _handledEmotes = new List<string>();
             _topicTimer = new Timer(state => TopicUpdate(),true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));
