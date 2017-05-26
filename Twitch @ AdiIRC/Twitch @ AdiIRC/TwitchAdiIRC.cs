@@ -137,7 +137,7 @@ namespace TwitchAdiIRC
             var isValidName = false;
             
             //See if the word is a valid nickname. 
-            foreach (IUser user in server.FindChannel(channel.Name).GetUsers)
+            foreach (IUser user in channel.GetUsers)
             {                
                 if (user.Nick == word)
                 {
