@@ -21,8 +21,8 @@ namespace TwitchAdiIRC
 
         public IPluginHost Host { get; set; }
         public ITools Tools { get; set; }
-        
-        private readonly string _emoteDirectory =  Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + @"\AdiIRC\TwitchEmotes";
+
+        private string _emoteDirectory;
         private Timer _topicTimer;
 
         private List<string> _handledEmotes;
@@ -42,16 +42,21 @@ namespace TwitchAdiIRC
             Host.OnEditboxKeyDown += HostOnOnEditboxKeyDown;
             Host.OnOptionsChanged += delegate { ReadConfig(); };
 
+            _emoteDirectory = Host.ConfigFolder + @"\TwitchEmotes";
             _handledEmotes = new List<string>();
             _topicTimer = new Timer(state => TopicUpdate(),true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));
 
-            if (File.Exists(Settings.FullPath))
+            var settingsPath = Host.ConfigFolder + @"\Plugins\TwitchConfig\Config.json";
+
+            if (File.Exists(settingsPath))
             {
-                _settings = Settings.Load();
+                _settings = Settings.Load(settingsPath);
             }
             else
             {
                 _settings = new Settings();
+                _settings.Path = settingsPath;
+                _settings.Save();
             }
 
             _settingsForm = new SettingsForm(_settings);
@@ -501,7 +506,7 @@ namespace TwitchAdiIRC
 
         private void ReadConfig()
         {
-            var configFilePath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + @"\AdiIRC\config.ini";
+            var configFilePath = Host.ConfigFolder + @"\config.ini";
 
             string configFile;
 
