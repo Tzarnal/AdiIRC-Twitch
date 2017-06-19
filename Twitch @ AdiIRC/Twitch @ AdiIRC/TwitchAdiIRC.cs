@@ -258,16 +258,16 @@ namespace TwitchAdiIRC
 
                     systemMessage = systemMessage.Replace("\\s", " ");
 
-                    var notice = $":Twitch!Twitch@Twitch.tv NOTICE {channel} :{systemMessage} [ {userMessage} ]";
+                    var notice = $":Twitch!Twitch@Twitch.tv NOTICE {channel} :{systemMessage} [ {userMessage} ]";                    
                     _twitchServer.SendFakeRaw(notice);
                 }else if (subNoMessageMatch.Success)
                 {
-                    var channel = subMessageMatch.Groups[2].ToString();
-                    var systemMessage = subMessageMatch.Groups[1].ToString();
+                    var channel = subNoMessageMatch.Groups[2].ToString();
+                    var systemMessage = subNoMessageMatch.Groups[1].ToString();
 
                     systemMessage = systemMessage.Replace("\\s", " ");
 
-                    var notice = $":Twitch!Twitch@Twitch.tv NOTICE {channel} :{systemMessage}";
+                    var notice = $":Twitch!Twitch@Twitch.tv NOTICE {channel} :{systemMessage}";                    
                     _twitchServer.SendFakeRaw(notice);
                 }
             }
