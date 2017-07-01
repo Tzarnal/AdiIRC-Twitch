@@ -50,3 +50,5 @@ CAP REQ :twitch.tv/membership
 ```
 
 Finally go to File->Plugins and select Twitch @ AdiIrc. Click Load. It should now say Loaded in Status and be working.
+
+This plugins uses AdiIRC own emoticon system to show twitch emotes. As such they must actually be enabled. You can find the option Through File-Options Selecting the "Emoticons" entry in the list and ticking the "Use Emoticons" box. 
