@@ -35,6 +35,8 @@ Installation
 
 Extract the files from your download. Copy both .dll's to '%localappdata%\AdiIRC\Plugins'
 
+Go into the Properties dialog ( rightclick, select "Properties") for both .dll files and if present click the "unblock" button. If you fail to do this you will likely encounter an error while trying to load the plugin that looks like [this]( http://i.imgur.com/x9ETiDD.jpg). Or read this [article](https://blogs.msdn.microsoft.com/drew/2009/12/23/xunit-and-td-net-fixing-the-attempt-was-made-to-load-an-assembly-from-a-network-location-problem/).
+
 Make sure you have twitch chat setup as a server in AdiIRC, twitch has a general IRC Guide [here](https://help.twitch.tv/customer/portal/articles/1302780-twitch-irc)
 
 In order for this plugin to work properly you have to add the following to the Commands (Server->Server List->Commands) tab of your twitch server in the Server List.
