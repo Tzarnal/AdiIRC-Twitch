@@ -1,7 +1,10 @@
 ﻿using System;
 using System.IO;
+using System.Windows.Forms;
 using AdiIRCAPIv2.Arguments.Aliasing;
 using AdiIRCAPIv2.Arguments.Channel;
+using AdiIRCAPIv2.Arguments.WindowInteraction;
+using AdiIRCAPIv2.Enumerators;
 using Timer = System.Threading.Timer;
 using AdiIRCAPIv2.Interfaces;
 using Twitch___AdiIRC.TwitchApi;
@@ -54,16 +57,35 @@ namespace Twitch___AdiIRC
             //Register Delegates
             _host.OnChannelJoin += OnChannelJoin;
             _host.OnRegisteredCommand += OnCommand;
+            _host.OnMenu += OnMenu;
 
             //Start a timer to update all channel topics regularly
             _topicTimer = new Timer(state => TopicUpdate(), true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));
+        }
+
+        private void OnMenu(MenuEventArgs argument)
+        {                                    
+            //The plugin should only add its config menu too relevant entries, 
+            //it makes no sense to add it to say the rightclick menu of a link
+            //For now that means the Commands menu and the rightclick menu of the twitch Server windows.
+            if ( (IsTwitchServer(argument.Server) && argument.MenuType == MenuType.Server) || argument.MenuType == MenuType.Menubar)
+            {
+                var menuItems = argument.MenuItems;
+
+                var toolStripMenuItem = new ToolStripMenuItem("Twitch@AdiIRC");
+                toolStripMenuItem.Click += delegate {
+                    _settingsForm.Show();
+                };
+
+                menuItems.Add(new ToolStripSeparator());
+                menuItems.Add(toolStripMenuItem);
+            }
         }
 
         private void OnCommand(RegisteredCommandArgs argument)
         {
             _settingsForm.Show();
         }
-
 
         private void OnChannelJoin(ChannelJoinArgs argument)
         {
