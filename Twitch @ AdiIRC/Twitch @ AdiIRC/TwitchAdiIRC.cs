@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using AdiIRCAPIv2.Arguments.Aliasing;
 using AdiIRCAPIv2.Arguments.Channel;
 using Timer = System.Threading.Timer;
 using AdiIRCAPIv2.Interfaces;
@@ -44,14 +45,23 @@ namespace Twitch___AdiIRC
                 _settings.Save();
             }
 
-            //Create the settings form. 
+            //Create the settings form
             _settingsForm = new SettingsForm(_settings);
+
+            //Register a command to show the settings form
+            _host.HookCommand("/twitch@");
 
             //Register Delegates
             _host.OnChannelJoin += OnChannelJoin;
+            _host.OnRegisteredCommand += OnCommand;
 
             //Start a timer to update all channel topics regularly
             _topicTimer = new Timer(state => TopicUpdate(), true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));
+        }
+
+        private void OnCommand(RegisteredCommandArgs argument)
+        {
+            _settingsForm.Show();
         }
 
 
