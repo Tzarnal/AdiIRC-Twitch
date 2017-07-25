@@ -61,11 +61,14 @@ namespace Twitch___AdiIRC
             //Register Delegates
             _host.OnChannelJoin += OnChannelJoin;            
             _host.OnMenu += OnMenu;            
-            _host.OnChannelNormalMessage += OnChannelNormalMessage;
+            _host.OnChannelNormalMessage += OnChannelNormalMessage;    
+            _host.OnEditboxKeyUp += OnEditboxKeyUp;
 
             //Start a timer to update all channel topics regularly
             _topicTimer = new Timer(state => TopicUpdate(), true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));
         }
+
+
 
         private void OnChannelNormalMessage(ChannelNormalMessageArgs argument)
         {
@@ -113,6 +116,104 @@ namespace Twitch___AdiIRC
         private void OnCommand(RegisteredCommandArgs argument)
         {
             _settingsForm.Show();
+        }
+        
+        private void OnEditboxKeyUp(EditboxKeyUpArgs argument)
+        {
+            //Check if this event was fired on twitch, or if the config says we should not adjust autocomplete
+            if (!IsTwitchServer(argument.Server) || !_settings.AutoComplete)
+            {
+                return;
+            }
+
+            //Early exit if its not a tab key 
+            if (argument.KeyEventArgs.KeyCode != Keys.Tab)
+            {
+                return;
+            }            
+
+            //Check if we're operating in a channel window, otherwise exit.
+            var channel = argument.Window as IChannel;
+            if (channel == null)
+            {
+                return;
+            }
+            
+            var editBoxCursor = argument.Editbox.SelectionStart;
+            var i = editBoxCursor;
+            var text = argument.Editbox.Text;
+
+            //Don't do work on an empty string
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return;
+            }
+
+            //Adjust backwards one due to how cursor position works. Then correct for out of bounds.
+            i--;
+            if (i < 0)
+            {
+                i = 0;
+            }
+
+            //Hardcoded, Waiting for the Options API
+            var FirstWordSuffix = ", ";
+
+            //If the text behind the cusor matches autocomplete inserted text, set i back by that much
+            var iOffset = i - FirstWordSuffix.Length;
+            if (iOffset > 0)
+            {
+                var subString = text.Substring(iOffset + 1, FirstWordSuffix.Length);
+
+                //Adjust backwards the length of the suffix
+                if (subString == FirstWordSuffix)
+                {
+                    i = iOffset;
+                    editBoxCursor -= FirstWordSuffix.Length;
+                }
+            }
+
+            //Search backwards to find the end of the current word.
+            while (text[i] != ' ' && i > 0)
+            {
+                i--;
+            }
+
+            //Offset one if its not the start of the text, don't want to include the spaces we searched for
+            if (i != 0)
+            {
+                i++;
+            }
+
+            //Substring to get a word           
+            var word = text.Substring(i, editBoxCursor - i);
+            var isValidName = false;
+
+            //See if the word is a valid nickname. 
+            foreach (IUser user in channel.GetUsers)
+            {
+                if (user.Nick == word)
+                {
+                    isValidName = true;
+                    break;
+                }
+            }
+
+            //Exit early if we don't need to edit the textbox.
+            if (!isValidName)
+            {
+                return;
+            }
+
+            //Supress further actions on this Event
+            argument.KeyEventArgs.SuppressKeyPress = true;
+
+            //Remember old selectionstart, changing text resets it.
+            var oldSelectionSTart = argument.Editbox.SelectionStart;
+            //Insert @
+            argument.Editbox.Text = text.Insert(i, "@");
+            //Fix the cursor position.
+            argument.Editbox.SelectionStart = oldSelectionSTart + 1;
         }
 
         private void OnChannelJoin(ChannelJoinArgs argument)
