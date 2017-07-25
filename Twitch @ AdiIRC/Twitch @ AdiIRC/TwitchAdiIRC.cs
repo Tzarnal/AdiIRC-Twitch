@@ -140,52 +140,21 @@ namespace Twitch___AdiIRC
             {
                 return;
             }
-            
-            var editBoxCursor = argument.Editbox.SelectionStart;
-            var i = editBoxCursor;
-            var text = argument.Editbox.Text;
 
             //Don't do work on an empty string
-            if (string.IsNullOrWhiteSpace(text))
+            if (string.IsNullOrWhiteSpace(argument.Editbox.Text))
             {
                 return;
             }
 
-            //Adjust backwards one due to how cursor position works. Then correct for out of bounds.
-            i--;
-            if (i < 0)
-            {
-                i = 0;
-            }
 
-            //Hardcoded, Waiting for the Options API
-            var FirstWordSuffix = ", ";
+            var editBoxCursor = argument.Editbox.SelectionStart;            
+            var text = argument.Editbox.Text;
 
-            //If the text behind the cusor matches autocomplete inserted text, set i back by that much
-            var iOffset = i - FirstWordSuffix.Length;
-            if (iOffset > 0)
-            {
-                var subString = text.Substring(iOffset + 1, FirstWordSuffix.Length);
-
-                //Adjust backwards the length of the suffix
-                if (subString == FirstWordSuffix)
-                {
-                    i = iOffset;
-                    editBoxCursor -= FirstWordSuffix.Length;
-                }
-            }
-
-            //Search backwards to find the end of the current word.
-            while (text[i] != ' ' && i > 0)
-            {
-                i--;
-            }
-
-            //Offset one if its not the start of the text, don't want to include the spaces we searched for
-            if (i != 0)
-            {
-                i++;
-            }
+            //Search for the wordstart.
+            var wordStartTuple = FindStringWordStartIndex(text, ", ", editBoxCursor);
+            int i = wordStartTuple.Item1;
+            editBoxCursor = wordStartTuple.Item2;
 
             //Substring to get a word           
             var word = text.Substring(i, editBoxCursor - i);
@@ -216,6 +185,46 @@ namespace Twitch___AdiIRC
             argument.Editbox.Text = text.Insert(i, "@");
             //Fix the cursor position.
             argument.Editbox.SelectionStart = oldSelectionSTart + 1;
+        }
+
+        private Tuple<int, int> FindStringWordStartIndex(string text, string wordSuffix, int startIndex)
+        {
+            var i = startIndex;
+
+            //Adjust backwards one due to how cursor position works. Then correct for out of bounds.
+            i--;
+            if (i < 0)
+            {
+                i = 0;
+            }
+
+            //If the text behind the cusor matches autocomplete inserted text, set i back by that much
+            var iOffset = i - wordSuffix.Length;
+            if (iOffset > 0)
+            {
+                var subString = text.Substring(iOffset + 1, wordSuffix.Length);
+
+                //Adjust backwards the length of the suffix
+                if (subString == wordSuffix)
+                {
+                    i = iOffset;
+                    startIndex -= wordSuffix.Length;
+                }
+            }
+
+            //Search backwards to find the end of the current word.
+            while (text[i] != ' ' && i > 0)
+            {
+                i--;
+            }
+
+            //Offset one if its not the start of the text, don't want to include the spaces we searched for
+            if (i != 0)
+            {
+                i++;
+            }
+
+            return Tuple.Create(i, startIndex);
         }
 
         private void OnChannelJoin(ChannelJoinArgs argument)
