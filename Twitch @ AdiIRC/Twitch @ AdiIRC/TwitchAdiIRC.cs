@@ -56,11 +56,10 @@ namespace Twitch___AdiIRC
             _settingsForm = new SettingsForm(_settings);
 
             //Register a command to show the settings form
-            _host.HookCommand("/twitch@");
+            _host.HookCommand("/twitch@",OnCommand);
 
             //Register Delegates
-            _host.OnChannelJoin += OnChannelJoin;
-            _host.OnRegisteredCommand += OnCommand;
+            _host.OnChannelJoin += OnChannelJoin;            
             _host.OnMenu += OnMenu;            
             _host.OnChannelNormalMessage += OnChannelNormalMessage;
 
