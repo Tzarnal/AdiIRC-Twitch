@@ -150,19 +150,16 @@ namespace Twitch___AdiIRC
             var editBoxCursor = argument.Editbox.SelectionStart;            
             var text = argument.Editbox.Text;
 
-            //Hardcodign these, untill kr0n gets me the options access.
-            var FirstWordSuffix = ", ";
-            var Suffix = "";
 
             //Search for the wordstart.
-            var wordStartTuple = FindStringWordStartIndex(text, FirstWordSuffix, editBoxCursor);
+            var wordStartTuple = FindStringWordStartIndex(text, _host.EditboxOptions.TabCompleteSuffixFirstWord, editBoxCursor);
 
             if (wordStartTuple.Item2 == editBoxCursor)
             {
                 //The FindStringWordStartIndex did not offset the initial word cursor 
                 //so it did not find a suffix. That means we can try and find the second suffix type.
 
-                wordStartTuple = FindStringWordStartIndex(text, Suffix, editBoxCursor);
+                wordStartTuple = FindStringWordStartIndex(text, _host.EditboxOptions.TabCompleteSuffix, editBoxCursor);
             }
 
             var i = wordStartTuple.Item1;
