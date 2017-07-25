@@ -80,18 +80,18 @@ namespace Twitch___AdiIRC
             }
             
             //Convert to a TwitchIrcMessage which handles parsing all the information
-            var TwitchMessage = new TwitchIrcMessage(argument);
+            var twitchMessage = new TwitchIrcMessage(argument);
             
             //Check if there are any emotes, if so iterate over them all and Register them.
-            if (TwitchMessage.HasEmotes)
+            if (twitchMessage.HasEmotes)
             {                
-                foreach (var emote in TwitchMessage.Emotes)
+                foreach (var emote in twitchMessage.Emotes)
                 {                    
                     RegisterEmote(emote);
                 }
             }
 
-            argument.Channel.OutputText(TwitchMessage.Emotes.Count.ToString());
+            argument.Channel.OutputText(twitchMessage.Emotes.Count.ToString());
         }
 
         private void OnMenu(MenuEventArgs argument)
