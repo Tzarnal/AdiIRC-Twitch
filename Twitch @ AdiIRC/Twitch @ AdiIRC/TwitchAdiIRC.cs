@@ -74,8 +74,6 @@ namespace Twitch___AdiIRC
             _topicTimer = new Timer(state => TopicUpdate(), true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));
         }
 
-
-
         private void OnChannelNormalMessage(ChannelNormalMessageArgs argument)
         {
             //Check if this event was fired on twitch, if not this plugin should 
@@ -95,9 +93,7 @@ namespace Twitch___AdiIRC
                 {                    
                     RegisterEmote(emote);
                 }
-            }
-
-            argument.Channel.OutputText(twitchMessage.Emotes.Count.ToString());
+            }            
         }
 
         private void OnMenu(MenuEventArgs argument)
