@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using AdiIRCAPIv2.Arguments.ChannelMessages;
 
-namespace TwitchAdiIRC
+namespace Twitch___AdiIRC
 {
     public class TwitchIrcMessage
     {
@@ -16,61 +17,27 @@ namespace TwitchAdiIRC
         public Dictionary<string, string> Tags;
         public List<TwitchEmote> Emotes;
 
-        private string MessageRegex = @"@(.+?) :((.+)!.+?) PRIVMSG (#.+?) :(.+)";
-        private string TagsRegex = @"(.*?=.*?);";
         private string EmoteRegex = @"((\d+):(\d+)-(\d+))";
 
-        public TwitchIrcMessage(string message)
+        public TwitchIrcMessage(ChannelNormalMessageArgs argument)
         {
-            var messageMatch = Regex.Match(message, MessageRegex);
+            //Assign information we care about to fields.
+            Message = argument.Message;
+            Tags = (Dictionary<string,string>) argument.MessageTags;
+            UserMask = argument.User.Host;
+            UserName = argument.User.Nick;
 
-            if (!messageMatch.Success)
-            {
-                throw new ArgumentException("Not a valid IRCv3 with tags message.");
-            }
-
-            //Simple assignments.    
-            UserMask = messageMatch.Groups[2].ToString();
-            UserName = messageMatch.Groups[3].ToString();
-            Channel = messageMatch.Groups[4].ToString();
-            Message = messageMatch.Groups[5].ToString();
-
-            //Tags
-            Tags = ParseTagsString(messageMatch.Groups[1].ToString());
-
-            //Parse for emotes
-            //Cointains IntParses and other general number and substring unpleasantness.
-
+            //Parse the Tags for emotes
+            //I'm being lazy on int.parse security so i'm throwing in a
+            //catchall Exception 
             try
             {
-                ExtractEmotes();
+                HasEmotes = ExtractEmotes();
             }
             catch (Exception)
             {
                 HasEmotes = false;
             }
-
-            ExtractBadges();
-        }
-
-        private Dictionary<string, string> ParseTagsString(string tagsString)
-        {
-            var tags = new Dictionary<string, string>();
-
-            var tagsMatches = Regex.Matches(tagsString, TagsRegex);
-
-            if (tagsMatches.Count > 0)
-            {
-                foreach (Match match in tagsMatches)
-                {
-                    var kvPair = match.Groups[1].ToString().Split('=');
-                    if (!string.IsNullOrEmpty(kvPair[1]))
-                    {
-                        tags.Add(kvPair[0], kvPair[1]);
-                    }
-                }
-            }
-            return tags;
         }
 
         private void ExtractBadges()
@@ -126,35 +93,40 @@ namespace TwitchAdiIRC
             HasBadges = !string.IsNullOrWhiteSpace(BadgeList);
         }
 
-        private void ExtractEmotes()
+        private bool ExtractEmotes()
         {
+            //Early exit if the tags does not contain any emotes.
             if (!Tags.ContainsKey("emotes"))
             {
-                HasEmotes = false;
-                return;
+                return false;
             }
 
             Emotes = new List<TwitchEmote>();
 
             var emoteMatches = Regex.Matches(Tags["emotes"], EmoteRegex);
 
-            if (emoteMatches.Count > 0)
+            //Early exit if no emotes were actually matched.
+            if (emoteMatches.Count <= 0)
             {
-                foreach (Match match in emoteMatches)
-                {
-                    var emoteId = int.Parse(match.Groups[2].ToString());
-                    var startIndex = int.Parse(match.Groups[3].ToString());
-                    var endIndex = int.Parse(match.Groups[4].ToString());
-
-                    var emoteName = Message.Substring(startIndex, endIndex - startIndex + 1);
-
-                    var emote = new TwitchEmote { Id = emoteId, Name = emoteName };
-
-                    Emotes.Add(emote);
-                }
+                return false;
             }
 
-            HasEmotes = true;
+            //Emotes are received as an id and the partof the message they match too
+            //So we substring the actual name of the mote out of the message.
+            foreach (Match match in emoteMatches)
+            {
+                var emoteId = int.Parse(match.Groups[2].ToString());
+                var startIndex = int.Parse(match.Groups[3].ToString());
+                var endIndex = int.Parse(match.Groups[4].ToString());
+
+                var emoteName = Message.Substring(startIndex, endIndex - startIndex + 1);
+
+                var emote = new TwitchEmote { Id = emoteId, Name = emoteName };
+
+                Emotes.Add(emote);
+            }
+
+            return true;
         }
     }
 }

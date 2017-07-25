@@ -1,13 +1,15 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Windows.Forms;
+using Timer = System.Threading.Timer;
+using Twitch___AdiIRC.TwitchApi;
 using AdiIRCAPIv2.Arguments.Aliasing;
 using AdiIRCAPIv2.Arguments.Channel;
+using AdiIRCAPIv2.Arguments.ChannelMessages;
 using AdiIRCAPIv2.Arguments.WindowInteraction;
 using AdiIRCAPIv2.Enumerators;
-using Timer = System.Threading.Timer;
 using AdiIRCAPIv2.Interfaces;
-using Twitch___AdiIRC.TwitchApi;
 
 namespace Twitch___AdiIRC
 {
@@ -24,7 +26,8 @@ namespace Twitch___AdiIRC
         private IPluginHost _host;
         
         private Timer _topicTimer;
-                
+        private List<string> _handledEmotes;
+
         private Settings _settings;        
         private SettingsForm _settingsForm;
 
@@ -48,7 +51,8 @@ namespace Twitch___AdiIRC
                 _settings.Save();
             }
 
-            //Create the settings form
+            //Intialise private fields
+            _handledEmotes = new List<string>();            
             _settingsForm = new SettingsForm(_settings);
 
             //Register a command to show the settings form
@@ -57,10 +61,35 @@ namespace Twitch___AdiIRC
             //Register Delegates
             _host.OnChannelJoin += OnChannelJoin;
             _host.OnRegisteredCommand += OnCommand;
-            _host.OnMenu += OnMenu;
+            _host.OnMenu += OnMenu;            
+            _host.OnChannelNormalMessage += OnChannelNormalMessage;
 
             //Start a timer to update all channel topics regularly
             _topicTimer = new Timer(state => TopicUpdate(), true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));
+        }
+
+        private void OnChannelNormalMessage(ChannelNormalMessageArgs argument)
+        {
+            //Check if this event was fired on twitch, if not this plugin should 
+            //never touch it so fires an early return.
+            if (!IsTwitchServer(argument.Server))
+            {
+                return;
+            }
+            
+            //Convert to a TwitchIrcMessage which handles parsing all the information
+            var TwitchMessage = new TwitchIrcMessage(argument);
+            
+            //Check if there are any emotes, if so iterate over them all and Register them.
+            if (TwitchMessage.HasEmotes)
+            {                
+                foreach (var emote in TwitchMessage.Emotes)
+                {                    
+                    RegisterEmote(emote);
+                }
+            }
+
+            argument.Channel.OutputText(TwitchMessage.Emotes.Count.ToString());
         }
 
         private void OnMenu(MenuEventArgs argument)
@@ -164,6 +193,46 @@ namespace Twitch___AdiIRC
             }
         }
 
+        public void RegisterEmote(TwitchEmote emote)
+        {
+            var window = _host.ActiveIWindow;            
+            
+            //Check if we've already added this emote
+            if (_handledEmotes.Contains(emote.Name))
+                return;
+            
+            var emoteDirectory = _host.ConfigFolder + @"\TwitchEmotes";            
+            var emoteFile = $"{emoteDirectory}\\{emote.Id}.png";
+            
+            //Check if we've already downloaded this emote earlier, if so just 
+            //add the existing file.
+            if (File.Exists(emoteFile))
+            {
+                window.OutputText("Found File");
+                //ExecuteCommand executes a scripting command like you entered 
+                //into the window ExecteCommand is being invoked on. 
+                //https://dev.adiirc.com/projects/adiirc/wiki/Scripting_Commands
+
+                //AdiIRC will supress the output of a slashcommand if its 
+                //instead invoked with a starting .
+
+                //Setoption is a slash command to add or change options in the .ini file
+                //https://dev.adiirc.com/projects/adiirc/wiki/Setoption
+                var command = $".setoption Emoticons Emoticon_{emote.Name} {emoteFile}";
+                window.ExecuteCommand(command);                
+                _handledEmotes.Add(emote.Name);
+                return;
+            }
+            
+            //Try to download the emote, then add it
+            if (emote.DownloadEmote(emoteFile))
+            {
+                //See above              
+                var command = $".setoption Emoticons Emoticon_{emote.Name} {emoteFile}";
+                window.ExecuteCommand(command);                
+                _handledEmotes.Add(emote.Name);
+            }            
+        }
 
         private bool IsTwitchServer(IServer server)
         {
