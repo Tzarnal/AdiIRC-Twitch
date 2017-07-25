@@ -51,6 +51,12 @@ namespace Twitch___AdiIRC
                 _settings.Save();
             }
 
+            //Ensure there is a directory to save emotes into. 
+            if (!Directory.Exists(_host.ConfigFolder + @"\TwitchEmotes"))
+            {
+                Directory.CreateDirectory(_host.ConfigFolder + @"\TwitchEmotes");
+            }
+
             //Intialise private fields
             _handledEmotes = new List<string>();            
             _settingsForm = new SettingsForm(_settings);
