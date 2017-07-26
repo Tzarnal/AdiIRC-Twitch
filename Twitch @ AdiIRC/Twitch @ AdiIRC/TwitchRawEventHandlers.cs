@@ -146,7 +146,7 @@ namespace Twitch___AdiIRC
                 }
 
                 //Construct the notice, twitch includes a detailed message for us about the nature of the subscription in the tags
-                var notice = $"Twitch!Twitch@tmi.twitch.tv NOTICE {channel} :{tags["system-msg"]}{userMessage}";
+                var notice = $":Twitch!Twitch@tmi.twitch.tv NOTICE {channel} :{tags["system-msg"]}{userMessage}";
 
                 server.SendFakeRaw(notice);
                 return true;
