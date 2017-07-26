@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Windows.Forms;
 using Timer = System.Threading.Timer;
 using Twitch___AdiIRC.TwitchApi;
@@ -178,7 +176,24 @@ namespace Twitch___AdiIRC
                 {                    
                     RegisterEmote(emote);
                 }
-            }            
+            }
+
+            //Check if there are any bits, if so register them as emotes and show a notice
+            if (_settings.ShowCheers && twitchMessage.Tags.ContainsKey("bits"))
+            {
+                argument.Channel.OutputText("found some bits");
+
+                if (RegisterBits(twitchMessage.Tags["bits"]))
+                {
+                    argument.Channel.OutputText("trying to send notice about bits");
+
+                    var emoteName = "cheer" + twitchMessage.Tags["bits"];
+                    var bitsMessage = twitchMessage.Tags["bits"] + " bits";
+
+                    var notice = $":Twitch!Twitch@tmi.twitch.tv NOTICE {argument.Channel.Name} :{twitchMessage.UserName} {emoteName} just cheered for {bitsMessage}! {emoteName}";
+                    argument.Server.SendFakeRaw(notice);
+                }
+            }
         }
 
         private void OnMenu(MenuEventArgs argument)
@@ -436,6 +451,56 @@ namespace Twitch___AdiIRC
                 window.ExecuteCommand(command);                
                 _handledEmotes.Add(emote.Name);
             }            
+        }
+
+        public bool RegisterBits(string bitCount)
+        {
+            var window = _host.ActiveIWindow;
+
+            if (string.IsNullOrEmpty(bitCount))
+                return false;
+
+            //Create a new Bit, its basically the same idea as an emote with slightly different specifics
+            var bit = new TwitchBit{Amount = bitCount};
+
+
+            var emoteDirectory = _host.ConfigFolder + @"\TwitchEmotes";
+            var emoteFile = $"{emoteDirectory}\\{bit.Name}.png";
+
+            //Already registered this bit earlyier
+            if (_handledEmotes.Contains(bit.Name))
+                return true;
+
+            //Check if we've already downloaded this bit earlier, if so just 
+            //add the existing file.
+            if (File.Exists(emoteFile))
+            {
+                //ExecuteCommand executes a scripting command like you entered 
+                //into the window ExecteCommand is being invoked on. 
+                //https://dev.adiirc.com/projects/adiirc/wiki/Scripting_Commands
+
+                //AdiIRC will supress the output of a slashcommand if its 
+                //instead invoked with a starting .
+
+                //Setoption is a slash command to add or change options in the .ini file
+                //https://dev.adiirc.com/projects/adiirc/wiki/Setoption
+                var command = $".setoption Emoticons Emoticon_{bit.Name} {emoteFile}";
+                window.ExecuteCommand(command);
+                _handledEmotes.Add(bit.Name);
+                return true;
+            }
+
+            //Try to download the emote, then add it
+            if (bit.DownloadBit(emoteFile))
+            {
+                //See above              
+                var command = $".setoption Emoticons Emoticon_{bit.Name} {emoteFile}";
+                window.ExecuteCommand(command);
+                _handledEmotes.Add(bit.Name);
+                return true;
+            }
+
+            return false;
         }
 
         private bool IsTwitchServer(IServer server)

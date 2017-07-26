@@ -61,6 +61,7 @@
     <Compile Include="TwitchApi\Channel.cs" />
     <Compile Include="TwitchApi\TwitchApiTools.cs" />
     <Compile Include="TwitchApi\Users.cs" />
+    <Compile Include="TwitchBit.cs" />
     <Compile Include="TwitchEmote.cs" />
     <Compile Include="TwitchIrcMessage.cs" />
     <Compile Include="TwitchRawEventHandlers.cs" />
