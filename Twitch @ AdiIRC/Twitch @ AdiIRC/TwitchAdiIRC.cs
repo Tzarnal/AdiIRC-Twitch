@@ -382,8 +382,7 @@ namespace Twitch___AdiIRC
             //Check if we've already downloaded this emote earlier, if so just 
             //add the existing file.
             if (File.Exists(emoteFile))
-            {
-                window.OutputText("Found File");
+            {                
                 //ExecuteCommand executes a scripting command like you entered 
                 //into the window ExecteCommand is being invoked on. 
                 //https://dev.adiirc.com/projects/adiirc/wiki/Scripting_Commands
