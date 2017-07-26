@@ -126,7 +126,7 @@ namespace Twitch___AdiIRC
                 }
             }
 
-            //CLEARCHAT is a message used by twitter to Timeout/Ban people, and clear their
+            //CLEARCHAT is a message used by twitch to Timeout/Ban people, and clear their
             //Text lines, We won't clear the text but will display the ban information
             if (rawMessage.Contains("CLEARCHAT"))
             {
