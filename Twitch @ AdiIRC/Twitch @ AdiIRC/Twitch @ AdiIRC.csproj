@@ -63,6 +63,7 @@
     <Compile Include="TwitchApi\Users.cs" />
     <Compile Include="TwitchEmote.cs" />
     <Compile Include="TwitchIrcMessage.cs" />
+    <Compile Include="TwitchRawEventHandlers.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Windows.Forms;
 using Timer = System.Threading.Timer;
 using Twitch___AdiIRC.TwitchApi;
 using AdiIRCAPIv2.Arguments.Aliasing;
 using AdiIRCAPIv2.Arguments.Channel;
 using AdiIRCAPIv2.Arguments.ChannelMessages;
+using AdiIRCAPIv2.Arguments.Connection;
 using AdiIRCAPIv2.Arguments.WindowInteraction;
 using AdiIRCAPIv2.Enumerators;
 using AdiIRCAPIv2.Interfaces;
@@ -69,9 +72,61 @@ namespace Twitch___AdiIRC
             _host.OnMenu += OnMenu;            
             _host.OnChannelNormalMessage += OnChannelNormalMessage;    
             _host.OnEditboxKeyUp += OnEditboxKeyUp;
+            _host.OnStringDataReceived += OnStringDataReceived;
 
             //Start a timer to update all channel topics regularly
             _topicTimer = new Timer(state => TopicUpdate(), true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));
+        }
+
+        /* Twitch uses many messages that are not technically part of the IRC
+         *  protocol. A few Examples:
+         *
+         *
+         * USERNOTICE to notify about (re)-subs
+         * CLEARCHAT to timeout/ban people
+         * USERSTATE to inform about users states
+         * ROOMSTATE to inform about channel states
+         * WHISPER for bot private messages
+         *            
+         * Because AdirIRC doesn't recongize those as real irc messages
+         *  we're goign to handle that very low level instead of
+         *  higher up in events like ChannelNormalMessage.
+
+         * We'll then either rewrite those messages into things AdiIRC does 
+         *  understand using SendFakeRaw or take other actions 
+         *  and finally Eat the original Raw Event.
+         */
+        private void OnStringDataReceived(StringDataReceivedArgs argument)
+        {                        
+            //Check if this event was fired on twitch, if not this plugin should 
+            //never touch it so fires an early return.
+            if (!IsTwitchServer(argument.Server))
+            {
+                return;
+            }
+            
+            //We'll need these later, frequently.
+            var server = argument.Server;
+            var rawMessage = argument.Data;
+            var tags = TwitchRawEventHandlers.ParseTagsFromString(rawMessage);
+                              
+            //Regexes are fairly expensive so we do an initial check with .Contains. 
+            //Only after that do we dispatch to a specific handler for that kind of Message
+            
+            //CLEARCHAT is a message used by twitter to Timeout/Ban people, and clear their
+            //Text lines, We won't clear the text but will display the ban information
+            if (rawMessage.Contains("CLEARCHAT"))
+            {
+                //Returns True if it succesfully handled a Clearchat
+                if (TwitchRawEventHandlers.ClearChat(server, rawMessage,_settings.ShowTimeouts, tags))
+                {
+                    //By setting the Data of the event to null AdiIRC will no longer parse this Message further.
+                    argument.Data = null;
+                    return;
+                }
+                
+            }
+            
         }
 
         private void OnChannelNormalMessage(ChannelNormalMessageArgs argument)

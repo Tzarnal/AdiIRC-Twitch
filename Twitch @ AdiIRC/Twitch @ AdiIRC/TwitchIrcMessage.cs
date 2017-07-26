@@ -17,7 +17,9 @@ namespace Twitch___AdiIRC
         public Dictionary<string, string> Tags;
         public List<TwitchEmote> Emotes;
 
-        private string EmoteRegex = @"((\d+):(\d+)-(\d+))";
+        private static readonly string _emoteRegex = @"((\d+):(\d+)-(\d+))";
+        private static readonly string _messageRegex = @"@(.+?) :((.+)!.+?) PRIVMSG (#.+?) :(.+)";
+        private static readonly string _tagsRegex = @"(.*?=.*?);";
 
         public TwitchIrcMessage(ChannelNormalMessageArgs argument)
         {
@@ -38,6 +40,39 @@ namespace Twitch___AdiIRC
             {
                 HasEmotes = false;
             }
+        }
+
+        public TwitchIrcMessage(string message)
+        {
+            //Parse a raw twitch message into a the seperate parts I care about.
+
+            var messageMatch = Regex.Match(message, _messageRegex);
+
+            if (!messageMatch.Success)
+            {
+                throw new ArgumentException("Not a valid IRCv3 with tags message.");
+            }
+
+            //Simple assignments.    
+            UserMask = messageMatch.Groups[2].ToString();
+            UserName = messageMatch.Groups[3].ToString();
+            Channel = messageMatch.Groups[4].ToString();
+            Message = messageMatch.Groups[5].ToString();
+
+            //Tags
+            Tags = TwitchRawEventHandlers.ParseTagsFromString(message);
+
+            //Parse the Tags for emotes
+            //I'm being lazy on int.parse security so i'm throwing in a
+            //catchall Exception 
+            try
+            {
+                ExtractEmotes();
+            }
+            catch (Exception)
+            {
+                HasEmotes = false;
+            }            
         }
 
         private void ExtractBadges()
@@ -103,7 +138,7 @@ namespace Twitch___AdiIRC
 
             Emotes = new List<TwitchEmote>();
 
-            var emoteMatches = Regex.Matches(Tags["emotes"], EmoteRegex);
+            var emoteMatches = Regex.Matches(Tags["emotes"], _emoteRegex);
 
             //Early exit if no emotes were actually matched.
             if (emoteMatches.Count <= 0)
