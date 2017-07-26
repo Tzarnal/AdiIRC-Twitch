@@ -40,6 +40,9 @@ namespace Twitch___AdiIRC
             {
                 HasEmotes = false;
             }
+
+            BadgeList = BadgesinTags(Tags);
+            HasBadges = !string.IsNullOrWhiteSpace(BadgeList);
         }
 
         public TwitchIrcMessage(string message)
@@ -72,60 +75,64 @@ namespace Twitch___AdiIRC
             catch (Exception)
             {
                 HasEmotes = false;
-            }            
-        }
-
-        private void ExtractBadges()
-        {
-            if (!Tags.ContainsKey("badges"))
-            {
-                HasBadges = false;
-                return;
             }
 
-            var badges = Tags["badges"];
+            BadgeList = BadgesinTags(Tags);
+            HasBadges = !string.IsNullOrWhiteSpace(BadgeList);
+        }
+
+        public static string BadgesinTags(Dictionary<string,string> tags)
+        {
+            var badgeList = "";
+
+            if (!tags.ContainsKey("badges"))
+            {                
+                return null;
+            }
+
+            var badges = tags["badges"];
 
             if (badges.Contains("broadcaster/1"))
             {
-                BadgeList += "📺";
+                badgeList += "📺";
             }
 
             if (badges.Contains("staff/1"))
             {
-                BadgeList += "🔧";
+                badgeList += "🔧";
             }
 
             if (badges.Contains("admin/1"))
             {
-                BadgeList += "🛡️";
+                badgeList += "🛡️";
             }
 
             if (badges.Contains("global_mod/1"))
             {
-                BadgeList += "⚔️";
+                badgeList += "⚔️";
             }
 
             if (badges.Contains("moderator/1"))
             {
-                BadgeList += "🗡️";
+                badgeList += "🗡️";
             }
 
             if (badges.Contains("subscriber/"))
             {
-                BadgeList += "⭐";
+                badgeList += "⭐";
             }
 
             if (badges.Contains("turbo/1"))
             {
-                BadgeList += "⚡";
+                badgeList += "⚡";
             }
 
             if (badges.Contains("prime/1"))
             {
-                BadgeList += "👑";
+                badgeList += "👑";
             }
 
-            HasBadges = !string.IsNullOrWhiteSpace(BadgeList);
+            return badgeList;
         }
 
         private bool ExtractEmotes()

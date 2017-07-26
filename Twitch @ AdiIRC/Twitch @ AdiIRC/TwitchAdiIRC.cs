@@ -149,6 +149,27 @@ namespace Twitch___AdiIRC
                 }
             }
 
+            //PRIVMSG is how irc handles normal text messsasges between users and to channels
+            //We need to hook into these to add unicode icon badges to usernames
+            if (rawMessage.Contains("PRIVMSG"))
+            {                                
+                //Check if we should show badges before doing work.
+                if (!_settings.ShowBadges)
+                {
+                    return;
+                }
+                
+                //Parse message into a TwitchMessage
+                var twitchMessage = new TwitchIrcMessage(rawMessage);
+
+                //Check if there are badges, if so, insert them into event.
+                if (twitchMessage.HasBadges)
+                {                    
+                    var newName = twitchMessage.BadgeList + twitchMessage.UserName;
+                    argument.Data = rawMessage.Replace($":{twitchMessage.UserName}!", $":{newName}!");
+                }
+            }
+
             //Final filter on some message types Twitch@AdiIRC does not need to handle but that are not proper IRC messages.
             if (rawMessage.Contains("WHISPER") || rawMessage.Contains("ROOMSTATE") || rawMessage.Contains("USERSTATE")  || rawMessage.Contains("HOSTTARGET") || rawMessage.Contains("GLOBALUSERSTATE") )
             {
