@@ -137,7 +137,26 @@ namespace Twitch___AdiIRC
                     argument.Data = null;
                     return;
                 }                
-            }            
+            }
+
+            //USERNOTICE is a message used by twitch to inform about (Re-)Subscriptions            
+            if (rawMessage.Contains("USERNOTICE"))
+            {
+                //Returns True if it succesfully handled a Clearchat
+                if (TwitchRawEventHandlers.Usernotice(server, rawMessage, _settings.ShowSubs, tags))
+                {
+                    //By setting the Data of the event to null AdiIRC will no longer parse this Message further.
+                    argument.Data = null;
+                    return;
+                }
+            }
+
+            //Final filter on some message types Twitch@AdiIRC does not need to handle but that are not proper IRC messages.
+            if (rawMessage.Contains("WHISPER") || rawMessage.Contains("ROOMSTATE") || rawMessage.Contains("USERSTATE")  || rawMessage.Contains("HOSTTARGET") || rawMessage.Contains("GLOBALUSERSTATE") )
+            {
+                //Silently eat these messages and do nothing. They only cause empty * lines to appear in the server tab and Twitch@AdiIRC does not use them
+                argument.Data = null;
+            }
         }
 
         private void OnChannelNormalMessage(ChannelNormalMessageArgs argument)

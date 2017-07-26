@@ -117,5 +117,43 @@ namespace Twitch___AdiIRC
             //We did not find a CLEARCHAT message, return false to indicate we did not handle the message
             return false;
         }
+
+        /* 
+         * USERNOTICE is a message used by twitch to by twitch to inform about (Re-)Subscriptions 
+         * It can take two forms with or without a user message attached. 
+         */
+        public static bool Usernotice(IServer server, string rawMessage, bool showSubs, Dictionary<string, string> tags)
+        {
+            var subRegexMessage = @".*USERNOTICE (#\w+)\s*(:.+)?";                    
+            var subMessageMatch = Regex.Match(rawMessage, subRegexMessage);
+
+            if (subMessageMatch.Success)
+            {
+                if (!showSubs)
+                {
+                    //It is definitly a USERNOTICE message but the settings say not to display it.
+                    return true;
+                }
+                
+                //Grab the channel part of the message, its always included.
+                var channel = subMessageMatch.Groups[1].ToString();
+                var userMessage = "";
+
+                //Check for the usermessage section, it has an included : as the first charcter so that needs to be removed.
+                if (subMessageMatch.Groups.Count >= 3 && !string.IsNullOrWhiteSpace(subMessageMatch.Groups[2].ToString()) )
+                {                   
+                    userMessage = $" [ { subMessageMatch.Groups[2].ToString().TrimStart(':')} ]";
+                }
+
+                //Construct the notice, twitch includes a detailed message for us about the nature of the subscription in the tags
+                var notice = $"Twitch!Twitch@tmi.twitch.tv NOTICE {channel} :{tags["system-msg"]}{userMessage}";
+
+                server.SendFakeRaw(notice);
+                return true;
+            }
+
+            //We did not find a USERNOTICE message, return false to indicate we did not handle the message
+            return false;
+        }
     }
 }
