@@ -109,10 +109,23 @@ namespace Twitch___AdiIRC
             var server = argument.Server;
             var rawMessage = argument.Data;
             var tags = TwitchRawEventHandlers.ParseTagsFromString(rawMessage);
-                              
+
             //Regexes are fairly expensive so we do an initial check with .Contains. 
             //Only after that do we dispatch to a specific handler for that kind of Message
-            
+
+            //NOTICE is a normal irc message but due to how twitch sends them 
+            //they don't arrive in the channel windows, but in the server.
+            if (rawMessage.Contains("NOTICE"))
+            {
+                //Returns True if it succesfully handled a NOTICE message
+                if (TwitchRawEventHandlers.Notice(server, rawMessage))
+                {
+                    //By setting the Data of the event to null AdiIRC will no longer parse this Message further.
+                    argument.Data = null;
+                    return;
+                }
+            }
+
             //CLEARCHAT is a message used by twitter to Timeout/Ban people, and clear their
             //Text lines, We won't clear the text but will display the ban information
             if (rawMessage.Contains("CLEARCHAT"))
@@ -123,10 +136,8 @@ namespace Twitch___AdiIRC
                     //By setting the Data of the event to null AdiIRC will no longer parse this Message further.
                     argument.Data = null;
                     return;
-                }
-                
-            }
-            
+                }                
+            }            
         }
 
         private void OnChannelNormalMessage(ChannelNormalMessageArgs argument)

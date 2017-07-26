@@ -39,6 +39,33 @@ namespace Twitch___AdiIRC
             return tags;
         }
 
+        /*
+         * NOTICE is a normal irc message but due to how twitch sends them 
+         * they don't arrive in the channel windows, but in the server.
+         */
+        public static bool Notice(IServer server, string rawMessage)
+        {
+            //Check if its a usable notice message
+            var noticeRegex = @".+ :tmi.twitch.tv NOTICE (#.+) :(.+)";
+            var noticeMatch = Regex.Match(rawMessage, noticeRegex);
+
+            if (noticeMatch.Success)
+            {
+                var channel = noticeMatch.Groups[1].ToString();
+                var message = noticeMatch.Groups[2].ToString();
+
+                //Send a fake regular irc notice
+                var notice = $":Twitch!Twitch@tmi.twitch.tv NOTICE {channel} :{message}";
+                server.SendFakeRaw(notice);
+
+                //Handled the NOTICE message.
+                return true;
+            }
+
+            //Not recognized as a NOTICE message, didn't handle it.
+            return false;
+        }
+
         /* 
          * CLEARCHAT is a message used by twitter to Timeout/Ban people, and clear their
          * Text lines, We won't clear the text but will display the ban information
