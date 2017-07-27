@@ -18,8 +18,7 @@ namespace Twitch___AdiIRC
         public List<TwitchEmote> Emotes;
 
         private static readonly string _emoteRegex = @"((\d+):(\d+)-(\d+))";
-        private static readonly string _messageRegex = @"@(.+?) :((.+)!.+?) PRIVMSG (#.+?) :(.+)";
-        private static readonly string _tagsRegex = @"(.*?=.*?);";
+        private static readonly string _messageRegex = @"@(.+?) :((.+)!.+?) PRIVMSG (#.+?) :(.+)";        
 
         public TwitchIrcMessage(ChannelNormalMessageArgs argument)
         {
