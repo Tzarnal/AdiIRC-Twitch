@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Timer = System.Threading.Timer;
 using Twitch___AdiIRC.TwitchApi;
@@ -71,6 +72,7 @@ namespace Twitch___AdiIRC
             _host.OnChannelNormalMessage += OnChannelNormalMessage;    
             _host.OnEditboxKeyUp += OnEditboxKeyUp;
             _host.OnStringDataReceived += OnStringDataReceived;
+            _host.OnStringDataSent += OnStringDataSent;
 
             //Start a timer to update all channel topics regularly
             _topicTimer = new Timer(state => TopicUpdate(), true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));
@@ -149,6 +151,19 @@ namespace Twitch___AdiIRC
                 }
             }
 
+            //WHISPER is a message used by twitch to handle private messsages between users ( and bots )
+            //But its not a normal IRC message type, so they have to be rewritten into PRIVMSG's
+            if (rawMessage.Contains("WHISPER"))
+            {
+                //Returns True if it succesfully handled a WHISPER
+                if (TwitchRawEventHandlers.WhisperReceived(server, rawMessage))
+                {
+                    //By setting the Data of the event to null AdiIRC will no longer parse this Message further.
+                    argument.Data = null;
+                    return;
+                }
+            }
+
             //PRIVMSG is how irc handles normal text messsasges between users and to channels
             //We need to hook into these to add unicode icon badges to usernames
             if (rawMessage.Contains("PRIVMSG"))
@@ -171,7 +186,7 @@ namespace Twitch___AdiIRC
             }
 
             //Final filter on some message types Twitch@AdiIRC does not need to handle but that are not proper IRC messages.
-            if (rawMessage.Contains("WHISPER") || rawMessage.Contains("ROOMSTATE") || rawMessage.Contains("USERSTATE")  || rawMessage.Contains("HOSTTARGET") || rawMessage.Contains("GLOBALUSERSTATE") )
+            if (rawMessage.Contains("ROOMSTATE") || rawMessage.Contains("USERSTATE")  || rawMessage.Contains("HOSTTARGET") || rawMessage.Contains("GLOBALUSERSTATE") )
             {
                 //Silently eat these messages and do nothing. They only cause empty * lines to appear in the server tab and Twitch@AdiIRC does not use them
                 argument.Data = null;
@@ -214,6 +229,38 @@ namespace Twitch___AdiIRC
                     var notice = $":Twitch!Twitch@tmi.twitch.tv NOTICE {argument.Channel.Name} :{twitchMessage.UserName} {emoteName} just cheered for {bitsMessage}! {emoteName}";
                     argument.Server.SendFakeRaw(notice);
                 }
+            }
+        }
+       
+        private void OnStringDataSent(StringDataSentArgs argument)
+        {
+            //Check if this event was fired on twitch, if not this plugin should 
+            //never touch it so fires an early return.
+            if (!IsTwitchServer(argument.Server))
+            {
+                return;
+            }
+
+            //Private messasges to users are not handles normally through twitch
+            //Instead they require a /w command to the jtv user.
+            //And then Twitch sends a WHISPER message to that user in your stead.
+
+            //So here we catch all PRIVMSG events the client sends to users
+            //And translate them into /w commands to jtv
+
+            var whisperRegex = @"PRIVMSG ((?!jtv )[^#]\S*) \x3A(.+)$";
+            var whisperMatch = Regex.Match(argument.Data, whisperRegex);
+
+            if (whisperMatch.Success)
+            {
+                var target = whisperMatch.Groups[1].ToString();
+                var message = whisperMatch.Groups[2].ToString();
+
+                var newMessage = $"PRIVMSG jtv :/w {target} {message}";
+                argument.Server.SendRaw(newMessage);
+
+                //Supress event.
+                argument.Data = null;
             }
         }
 

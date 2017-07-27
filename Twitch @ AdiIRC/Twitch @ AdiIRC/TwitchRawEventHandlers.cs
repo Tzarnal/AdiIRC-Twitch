@@ -155,5 +155,29 @@ namespace Twitch___AdiIRC
             //We did not find a USERNOTICE message, return false to indicate we did not handle the message
             return false;
         }
+
+        //WHISPER is a message used by twitch to handle private messsages between users ( and bots )
+        //But its not a normal IRC message type, so they have to be rewritten into PRIVMSG's
+        public static bool WhisperReceived(IServer server, string rawMessage)
+        {                            
+            var whisperRegex = @".*(\x3A[^!@ ]+![^@ ]+@\S+) WHISPER (\S+) (\x3A.*)";
+            var whisperMatch = Regex.Match(rawMessage, whisperRegex);
+            
+            if (whisperMatch.Success)
+            {
+                var sender = whisperMatch.Groups[1];
+                var target = whisperMatch.Groups[2];
+                var message = whisperMatch.Groups[3];
+
+                //Construct and send a proper PRIVSMG instead of the WHISPER
+                var privmsg = $"{sender} PRIVMSG {target} {message}";
+
+                server.SendFakeRaw(privmsg);                
+                return true;
+            }
+
+            //We did not find a WHISPER message, return false to indicate we did not handle the message
+            return false;
+        }
     }
 }
