@@ -316,6 +316,45 @@ namespace Twitch___AdiIRC
             //Fix the cursor position.
             argument.Editbox.SelectionStart = oldSelectionSTart + 1;
         }
+        
+        private void OnChannelJoin(ChannelJoinArgs argument)
+        {
+            //Check if this event was fired on twitch, if not this plugin should 
+            //never touch it so fires an early return.
+            if (!IsTwitchServer(argument.Server))
+            {
+                return;
+            }
+                            
+            var server = argument.Server;
+            var channelName = argument.Channel.Name;
+            var userName = argument.Channel.Name.TrimStart('#');
+            string topicData;
+
+            //Check if this event fired on the client joining the channel or 
+            //someone else joining, we only need to set the topic of a channel
+            //when we join a channel.
+            if (argument.User.Nick != argument.Server.Nick)
+            {
+                return;
+            }
+
+            //TwitchApiTools connects to the web, disk or web IO is unreliable 
+            //so handle it in a try / catch block
+            try
+            {                
+                topicData = TwitchApiTools.GetSimpleChannelInformationByName(userName);
+                
+            }
+            catch (Exception)
+            {
+                topicData = $"Twitch@AdiIRC: Could not find channel topic data for {userName}.";
+            }
+
+            //Finally set the topic title through a raw IRC message.
+            var topicMessage = $":Twitch!Twitch@Twitch.tv TOPIC {channelName} :{topicData}";
+            server.SendFakeRaw(topicMessage);
+        }
 
         private Tuple<int, int> FindStringWordStartIndex(string text, string wordSuffix, int startIndex)
         {
@@ -355,45 +394,6 @@ namespace Twitch___AdiIRC
             }
 
             return Tuple.Create(i, startIndex);
-        }
-
-        private void OnChannelJoin(ChannelJoinArgs argument)
-        {
-            //Check if this event was fired on twitch, if not this plugin should 
-            //never touch it so fires an early return.
-            if (!IsTwitchServer(argument.Server))
-            {
-                return;
-            }
-                            
-            var server = argument.Server;
-            var channelName = argument.Channel.Name;
-            var userName = argument.Channel.Name.TrimStart('#');
-            string topicData;
-
-            //Check if this event fired on the client joining the channel or 
-            //someone else joining, we only need to set the topic of a channel
-            //when we join a channel.
-            if (argument.User.Nick != argument.Server.Nick)
-            {
-                return;
-            }
-
-            //TwitchApiTools connects to the web, disk or web IO is unreliable 
-            //so handle it in a try / catch block
-            try
-            {                
-                topicData = TwitchApiTools.GetSimpleChannelInformationByName(userName);
-                
-            }
-            catch (Exception)
-            {
-                topicData = $"Twitch@AdiIRC: Could not find channel topic data for {userName}.";
-            }
-
-            //Finally set the topic title through a raw IRC message.
-            var topicMessage = $":Twitch!Twitch@Twitch.tv TOPIC {channelName} :{topicData}";
-            server.SendFakeRaw(topicMessage);
         }
 
         private void TopicUpdate()
