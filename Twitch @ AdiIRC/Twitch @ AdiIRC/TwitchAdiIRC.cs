@@ -216,13 +216,9 @@ namespace Twitch___AdiIRC
 
             //Check if there are any bits, if so register them as emotes and show a notice
             if (_settings.ShowCheers && twitchMessage.Tags.ContainsKey("bits"))
-            {
-                argument.Channel.OutputText("found some bits");
-
+            {                
                 if (RegisterBits(twitchMessage.Tags["bits"]))
-                {
-                    argument.Channel.OutputText("trying to send notice about bits");
-
+                {                    
                     var emoteName = "cheer" + twitchMessage.Tags["bits"];
                     var bitsMessage = twitchMessage.Tags["bits"] + " bits";
 
