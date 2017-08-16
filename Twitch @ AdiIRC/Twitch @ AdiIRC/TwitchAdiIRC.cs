@@ -197,7 +197,7 @@ namespace Twitch___AdiIRC
         {
             //Check if this event was fired on twitch, if not this plugin should 
             //never touch it so fires an early return.
-            if (!IsTwitchServer(argument.Server))
+            if (!IsTwitchServer(argument.Channel.Server))
             {
                 return;
             }
@@ -223,7 +223,7 @@ namespace Twitch___AdiIRC
                     var bitsMessage = twitchMessage.Tags["bits"] + " bits";
 
                     var notice = $":Twitch!Twitch@tmi.twitch.tv NOTICE {argument.Channel.Name} :{twitchMessage.UserName} {emoteName} just cheered for {bitsMessage}! {emoteName}";
-                    argument.Server.SendFakeRaw(notice);
+                    argument.Channel.Server.SendFakeRaw(notice);
                 }
             }
         }
@@ -265,7 +265,7 @@ namespace Twitch___AdiIRC
             //The plugin should only add its config menu too relevant entries, 
             //it makes no sense to add it to say the rightclick menu of a link
             //For now that means the Commands menu and the rightclick menu of the twitch Server windows.
-            if ( (IsTwitchServer(argument.Server) && argument.MenuType == MenuType.Server) || argument.MenuType == MenuType.Menubar)
+            if ( (IsTwitchServer(argument.Window.Server) && argument.MenuType == MenuType.Server) || argument.MenuType == MenuType.Menubar)
             {
                 var menuItems = argument.MenuItems;
 
@@ -287,7 +287,7 @@ namespace Twitch___AdiIRC
         private void OnEditboxKeyUp(EditboxKeyUpArgs argument)
         {
             //Check if this event was fired on twitch, or if the config says we should not adjust autocomplete
-            if (!IsTwitchServer(argument.Server) || !_settings.AutoComplete)
+            if (!IsTwitchServer(argument.Window.Server) || !_settings.AutoComplete)
             {
                 return;
             }
@@ -364,12 +364,12 @@ namespace Twitch___AdiIRC
         {
             //Check if this event was fired on twitch, if not this plugin should 
             //never touch it so fires an early return.
-            if (!IsTwitchServer(argument.Server))
+            if (!IsTwitchServer(argument.Channel.Server))
             {
                 return;
             }
                             
-            var server = argument.Server;
+            var server = argument.Channel.Server;
             var channelName = argument.Channel.Name;
             var userName = argument.Channel.Name.TrimStart('#');
             string topicData;
@@ -377,7 +377,7 @@ namespace Twitch___AdiIRC
             //Check if this event fired on the client joining the channel or 
             //someone else joining, we only need to set the topic of a channel
             //when we join a channel.
-            if (argument.User.Nick != argument.Server.Nick)
+            if (argument.User.Nick != argument.Channel.Server.Nick)
             {
                 return;
             }
