@@ -1,462 +1,577 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Net;
 using System.Text.RegularExpressions;
+using System.Windows.Forms;
 using Timer = System.Threading.Timer;
 using Twitch___AdiIRC.TwitchApi;
-using AdiIRCAPI;
-using Twitch___AdiIRC;
+using AdiIRCAPIv2.Arguments.Aliasing;
+using AdiIRCAPIv2.Arguments.Channel;
+using AdiIRCAPIv2.Arguments.ChannelMessages;
+using AdiIRCAPIv2.Arguments.Connection;
+using AdiIRCAPIv2.Arguments.WindowInteraction;
+using AdiIRCAPIv2.Enumerators;
+using AdiIRCAPIv2.Interfaces;
 
-namespace TwitchAdiIRC
+namespace Twitch___AdiIRC
 {
+    //Inerit form IPlugin to be an AdiIRC plugin.
     public class TwitchAdiIrc : IPlugin
     {
-        public string Description => "Provides simple additional features like emotes for twitch chat integration.";
-        public string Author => "Xesyto";
-        public string Name => "Twitch @ AdiIRC";
-        public string Version => "5";
-        public string Email => "";
+        //Mandatory information fields.
+        public string PluginDescription => "Provides simple additional features like emotes for twitch chat integration.";
+        public string PluginAuthor => "Xesyto";
+        public string PluginName => "Twitch @ AdiIRC";
+        public string PluginVersion => "6";
+        public string PluginEmail => "s.oudenaarden@gmail.com";
 
-        public IPluginHost Host { get; set; }
-        public ITools Tools { get; set; }
+        private IPluginHost _host;
         
-        private readonly string _emoteDirectory =  Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + @"\AdiIRC\TwitchEmotes";
         private Timer _topicTimer;
-
         private List<string> _handledEmotes;
-        private IServer _twitchServer;
+
         private Settings _settings;        
         private SettingsForm _settingsForm;
 
-
-        public void Initialize()
+        public void Initialize(IPluginHost host)
         {
-            //Register Delegates. 
-            Host.OnRawData += MyHostOnOnRawData;
-            Host.OnJoin += HostOnOnJoin;
-            Host.OnCommand += HostOnOnCommand;
-            //Host.OnMenu += HostOnOnMenu;
+            //Store the host in a private field, we want to be able to access it later
+            _host = host;
 
-            _handledEmotes = new List<string>();
-            _topicTimer = new Timer(state => TopicUpdate(),true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));
+            //Fetch the Config folder and attach the correct path to 
+            //Twitch @AdiIRC's config file
+            var settingsPath = _host.ConfigFolder + @"\Plugins\TwitchConfig\Config.json";
 
-            if (File.Exists(Settings.FullPath))
+            //Either Load an existing config file or create a new one with default values.
+            if (File.Exists(settingsPath))
             {
-                _settings = Settings.Load();
+                _settings = Settings.Load(settingsPath);
             }
             else
             {
-                _settings = new Settings();
+                _settings = new Settings {Path = settingsPath};
+                _settings.Save();
             }
 
+            //Ensure there is a directory to save emotes into. 
+            if (!Directory.Exists(_host.ConfigFolder + @"\TwitchEmotes"))
+            {
+                Directory.CreateDirectory(_host.ConfigFolder + @"\TwitchEmotes");
+            }
+
+            //Intialise private fields
+            _handledEmotes = new List<string>();            
             _settingsForm = new SettingsForm(_settings);
 
-            Host.HookCommand(this, "/twitch@", "configure twitch @ adiirc",
-                "show a window that lets you change twitch # adiirc settings");
-            
+            //Register a command to show the settings form
+            _host.HookCommand("/twitch@",OnCommand);
 
-            if (!Directory.Exists(_emoteDirectory))
+            //Register Delegates
+            _host.OnChannelJoin += OnChannelJoin;            
+            _host.OnMenu += OnMenu;            
+            _host.OnChannelNormalMessage += OnChannelNormalMessage;    
+            _host.OnEditboxKeyUp += OnEditboxKeyUp;
+            _host.OnStringDataReceived += OnStringDataReceived;
+            _host.OnStringDataSent += OnStringDataSent;
+
+            //Start a timer to update all channel topics regularly
+            _topicTimer = new Timer(state => TopicUpdate(), true, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(10));
+        }
+
+        /* Twitch uses many messages that are not technically part of the IRC
+         *  protocol. A few Examples:
+         *
+         *
+         * USERNOTICE to notify about (re)-subs
+         * CLEARCHAT to timeout/ban people
+         * USERSTATE to inform about users states
+         * ROOMSTATE to inform about channel states
+         * WHISPER for bot private messages
+         *            
+         * Because AdirIRC doesn't recongize those as real irc messages
+         *  we're goign to handle that very low level instead of
+         *  higher up in events like ChannelNormalMessage.
+
+         * We'll then either rewrite those messages into things AdiIRC does 
+         *  understand using SendFakeRaw or take other actions 
+         *  and finally Eat the original Raw Event.
+         */
+        private void OnStringDataReceived(StringDataReceivedArgs argument)
+        {                        
+            //Check if this event was fired on twitch, if not this plugin should 
+            //never touch it so fires an early return.
+            if (!IsTwitchServer(argument.Server))
             {
-                Directory.CreateDirectory(_emoteDirectory);
+                return;
+            }
+            
+            //We'll need these later, frequently.
+            var server = argument.Server;
+            var rawMessage = argument.Data;
+            var tags = TwitchRawEventHandlers.ParseTagsFromString(rawMessage);
+
+            //Regexes are fairly expensive so we do an initial check with .Contains. 
+            //Only after that do we dispatch to a specific handler for that kind of Message
+
+            //NOTICE is a normal irc message but due to how twitch sends them 
+            //they don't arrive in the channel windows, but in the server.
+            if (rawMessage.Contains("NOTICE"))
+            {
+                //Returns True if it succesfully handled a NOTICE message
+                if (TwitchRawEventHandlers.Notice(server, rawMessage))
+                {
+                    //By setting the Data of the event to null AdiIRC will no longer parse this Message further.
+                    argument.Data = null;
+                    return;
+                }
+            }
+
+            //CLEARCHAT is a message used by twitch to Timeout/Ban people, and clear their
+            //Text lines, We won't clear the text but will display the ban information
+            if (rawMessage.Contains("CLEARCHAT"))
+            {
+                //Returns True if it succesfully handled a Clearchat
+                if (TwitchRawEventHandlers.ClearChat(server, rawMessage,_settings.ShowTimeouts, tags))
+                {
+                    //By setting the Data of the event to null AdiIRC will no longer parse this Message further.
+                    argument.Data = null;
+                    return;
+                }                
+            }
+
+            //USERNOTICE is a message used by twitch to inform about (Re-)Subscriptions            
+            if (rawMessage.Contains("USERNOTICE"))
+            {
+                //Returns True if it succesfully handled a Clearchat
+                if (TwitchRawEventHandlers.Usernotice(server, rawMessage, _settings.ShowSubs, tags))
+                {
+                    //By setting the Data of the event to null AdiIRC will no longer parse this Message further.
+                    argument.Data = null;
+                    return;
+                }
+            }
+
+            //WHISPER is a message used by twitch to handle private messsages between users ( and bots )
+            //But its not a normal IRC message type, so they have to be rewritten into PRIVMSG's
+            if (rawMessage.Contains("WHISPER"))
+            {
+                //Returns True if it succesfully handled a WHISPER
+                if (TwitchRawEventHandlers.WhisperReceived(server, rawMessage))
+                {
+                    //By setting the Data of the event to null AdiIRC will no longer parse this Message further.
+                    argument.Data = null;
+                    return;
+                }
+            }
+
+            //PRIVMSG is how irc handles normal text messsasges between users and to channels
+            //We need to hook into these to add unicode icon badges to usernames
+            if (rawMessage.Contains("PRIVMSG"))
+            {                                
+                //Check if we should show badges before doing work.
+                if (!_settings.ShowBadges)
+                {
+                    return;
+                }
+                
+                //Parse message into a TwitchMessage
+                var twitchMessage = new TwitchIrcMessage(rawMessage);
+
+                //Check if there are badges, if so, insert them into event.
+                if (twitchMessage.HasBadges)
+                {                    
+                    var newName = twitchMessage.BadgeList + twitchMessage.UserName;
+                    argument.Data = rawMessage.Replace($":{twitchMessage.UserName}!", $":{newName}!");
+                }
+            }
+
+            //Final filter on some message types Twitch@AdiIRC does not need to handle but that are not proper IRC messages.
+            if (rawMessage.Contains("ROOMSTATE") || rawMessage.Contains("USERSTATE")  || rawMessage.Contains("HOSTTARGET") || rawMessage.Contains("GLOBALUSERSTATE") )
+            {
+                //Silently eat these messages and do nothing. They only cause empty * lines to appear in the server tab and Twitch@AdiIRC does not use them
+                argument.Data = null;
             }
         }
 
-        /*private void HostOnOnMenu(IServer server, object window, MenuType menuType, string text, ToolStripItemCollection menuItems)
+        private void OnChannelNormalMessage(ChannelNormalMessageArgs argument)
         {
-            if (!server.Network.ToLower().Contains("twitch") || !string.IsNullOrWhiteSpace(text))
+            //Check if this event was fired on twitch, if not this plugin should 
+            //never touch it so fires an early return.
+            if (!IsTwitchServer(argument.Channel.Server))
+            {
+                return;
+            }
+            
+            //Convert to a TwitchIrcMessage which handles parsing all the information
+            var twitchMessage = new TwitchIrcMessage(argument);
+            
+            //Check if there are any emotes, if so iterate over them all and Register them.
+            if (twitchMessage.HasEmotes)
+            {                
+                foreach (var emote in twitchMessage.Emotes)
+                {                    
+                    RegisterEmote(emote);
+                }
+            }
+
+            //Check if there are any bits, if so register them as emotes and show a notice
+            if (_settings.ShowCheers && twitchMessage.Tags.ContainsKey("bits"))
+            {                
+                if (RegisterBits(twitchMessage.Tags["bits"]))
+                {                    
+                    var emoteName = "cheer" + twitchMessage.Tags["bits"];
+                    var bitsMessage = twitchMessage.Tags["bits"] + " bits";
+
+                    var notice = $":Twitch!Twitch@tmi.twitch.tv NOTICE {argument.Channel.Name} :{twitchMessage.UserName} {emoteName} just cheered for {bitsMessage}! {emoteName}";
+                    argument.Channel.Server.SendFakeRaw(notice);
+                }
+            }
+        }
+       
+        private void OnStringDataSent(StringDataSentArgs argument)
+        {
+            //Check if this event was fired on twitch, if not this plugin should 
+            //never touch it so fires an early return.
+            if (!IsTwitchServer(argument.Server))
             {
                 return;
             }
 
-            var toolStripMenuItem = new ToolStripMenuItem("Twitch@AdiIRC");
-            toolStripMenuItem.Click += delegate (object sender, EventArgs args) {
-                _settingsForm.Show();
-            };
+            //Private messasges to users are not handles normally through twitch
+            //Instead they require a /w command to the jtv user.
+            //And then Twitch sends a WHISPER message to that user in your stead.
 
-            menuItems.Add(new ToolStripSeparator());
-            menuItems.Add(toolStripMenuItem);
-        }*/
+            //So here we catch all PRIVMSG events the client sends to users
+            //And translate them into /w commands to jtv
 
-        private void HostOnOnCommand(object window, string command, string args)
+            var whisperRegex = @"PRIVMSG ((?!jtv )[^#]\S*) \x3A(.+)$";
+            var whisperMatch = Regex.Match(argument.Data, whisperRegex);
+
+            if (whisperMatch.Success)
+            {
+                var target = whisperMatch.Groups[1].ToString();
+                var message = whisperMatch.Groups[2].ToString();
+
+                var newMessage = $"PRIVMSG jtv :/w {target} {message}";
+                argument.Server.SendRaw(newMessage);
+
+                //Supress event.
+                argument.Data = null;
+            }
+        }
+
+        private void OnMenu(MenuEventArgs argument)
+        {                                    
+            //The plugin should only add its config menu too relevant entries, 
+            //it makes no sense to add it to say the rightclick menu of a link
+            //For now that means the Commands menu and the rightclick menu of the twitch Server windows.
+            if ( (IsTwitchServer(argument.Window.Server) && argument.MenuType == MenuType.Server) || argument.MenuType == MenuType.Menubar)
+            {
+                var menuItems = argument.MenuItems;
+
+                var toolStripMenuItem = new ToolStripMenuItem("Twitch@AdiIRC");
+                toolStripMenuItem.Click += delegate {
+                    _settingsForm.Show();
+                };
+
+                menuItems.Add(new ToolStripSeparator());
+                menuItems.Add(toolStripMenuItem);
+            }
+        }
+
+        private void OnCommand(RegisteredCommandArgs argument)
         {
             _settingsForm.Show();
         }
-
-        private void HostOnOnJoin(IServer server, IChannel channel, IUser user, out EatData @return)
+        
+        private void OnEditboxKeyUp(EditboxKeyUpArgs argument)
         {
-            @return = EatData.EatNone;
-
-            CheckTwitchServer();
-
-            if (!server.Network.ToLower().Contains("twitch"))                            
-                return;
-            
-            if (user.Nick != _twitchServer.UserNick)
-                return;
-
-            try
+            //Check if this event was fired on twitch, or if the config says we should not adjust autocomplete
+            if (!IsTwitchServer(argument.Window.Server) || !_settings.AutoComplete)
             {
-                var userName = channel.Name.TrimStart('#');
-                var topicData = TwitchApiTools.GetSimpleChannelInformationByName(userName);
+                return;
+            }
+
+            //Early exit if its not a tab key 
+            if (argument.KeyEventArgs.KeyCode != Keys.Tab)
+            {
+                return;
+            }            
+
+            //Check if we're operating in a channel window, otherwise exit.
+            var channel = argument.Window as IChannel;
+            if (channel == null)
+            {
+                return;
+            }
+
+            //Don't do work on an empty string
+            if (string.IsNullOrWhiteSpace(argument.Editbox.Text))
+            {
+                return;
+            }
+
+            var editBoxCursor = argument.Editbox.SelectionStart;            
+            var text = argument.Editbox.Text;
+
+
+            //Search for the wordstart.
+            var wordStartTuple = FindStringWordStartIndex(text, _host.EditboxOptions.TabCompleteSuffixFirstWord, editBoxCursor);
+
+            if (wordStartTuple.Item2 == editBoxCursor)
+            {
+                //The FindStringWordStartIndex did not offset the initial word cursor 
+                //so it did not find a suffix. That means we can try and find the second suffix type.
+
+                wordStartTuple = FindStringWordStartIndex(text, _host.EditboxOptions.TabCompleteSuffix, editBoxCursor);
+            }
+
+            var i = wordStartTuple.Item1;
+            editBoxCursor = wordStartTuple.Item2;
+
+            //Substring to get a word           
+            var word = text.Substring(i, editBoxCursor - i);
+            var isValidName = false;
+
+            //See if the word is a valid nickname. 
+            foreach (IUser user in channel.GetUsers)
+            {
+                if (user.Nick == word)
+                {
+                    isValidName = true;
+                    break;
+                }
+            }
+
+            //Exit early if we don't need to edit the textbox.
+            if (!isValidName)
+            {
+                return;
+            }
+
+            //Supress further actions on this Event
+            argument.KeyEventArgs.SuppressKeyPress = true;
+
+            //Remember old selectionstart, changing text resets it.
+            var oldSelectionSTart = argument.Editbox.SelectionStart;
+            //Insert @
+            argument.Editbox.Text = text.Insert(i, "@");
+            //Fix the cursor position.
+            argument.Editbox.SelectionStart = oldSelectionSTart + 1;
+        }
+        
+        private void OnChannelJoin(ChannelJoinArgs argument)
+        {
+            //Check if this event was fired on twitch, if not this plugin should 
+            //never touch it so fires an early return.
+            if (!IsTwitchServer(argument.Channel.Server))
+            {
+                return;
+            }
+                            
+            var server = argument.Channel.Server;
+            var channelName = argument.Channel.Name;
+            var userName = argument.Channel.Name.TrimStart('#');
+            string topicData;
+
+            //Check if this event fired on the client joining the channel or 
+            //someone else joining, we only need to set the topic of a channel
+            //when we join a channel.
+            if (argument.User.Nick != argument.Channel.Server.Nick)
+            {
+                return;
+            }
+
+            //TwitchApiTools connects to the web, disk or web IO is unreliable 
+            //so handle it in a try / catch block
+            try
+            {                
+                topicData = TwitchApiTools.GetSimpleChannelInformationByName(userName);
                 
-                var topicMessage = $":Twitch!Twitch@Twitch.tv TOPIC {channel.Name} :{topicData}";
-                _twitchServer.SendFakeRaw(topicMessage);
             }
             catch (Exception)
             {
-                Host.SendCommand(_twitchServer, ".echo", "Error updating channel topic.");                
+                topicData = $"Twitch@AdiIRC: Could not find channel topic data for {userName}.";
             }
-            
+
+            //Finally set the topic title through a raw IRC message.
+            var topicMessage = $":Twitch!Twitch@Twitch.tv TOPIC {channelName} :{topicData}";
+            server.SendFakeRaw(topicMessage);
         }
 
-        private void MyHostOnOnRawData(object sender, RawDataArgs rawDataArgs)
+        private Tuple<int, int> FindStringWordStartIndex(string text, string wordSuffix, int startIndex)
         {
-            if (CheckTwitchServer() == false)
-                return;
+            var i = startIndex;
 
-            var dataString = System.Text.Encoding.UTF8.GetString(rawDataArgs.Bytes);
-
-            //Process Message
-            if (dataString.Contains("PRIVMSG ")) 
+            //Adjust backwards one due to how cursor position works. Then correct for out of bounds.
+            i--;
+            if (i < 0)
             {
-                //Handle Subscriptions ( not resubs, also prime subs )
-                var primeRegex = @"twitchnotify!twitchnotify@twitchnotify.tmi.twitch.tv PRIVMSG (#\S+) :(.*subscribed.*)";
-                var primeMatch = Regex.Match(dataString, primeRegex);
-
-                if (_settings.ShowSubs && primeMatch.Success)
-                {
-                    var channel = primeMatch.Groups[1].ToString();
-                    var message = primeMatch.Groups[2].ToString();
-
-                    var notice = $":Twitch!Twitch@Twitch.tv NOTICE {channel} :{message}";
-                    _twitchServer.SendFakeRaw(notice);
-
-                    rawDataArgs.Bytes = null;
-                    return;
-                }
-
-
-                TwitchIrcMessage twitchMessage;
-
-                try
-                {
-                    twitchMessage = new TwitchIrcMessage(dataString);
-                }
-                catch (Exception)
-                {
-                    return;
-                }
-
-                //Handle Emotes
-                if (twitchMessage.HasEmotes)
-                {                    
-                    RegisterEmotes(twitchMessage.Emotes);
-                }
-
-                //Handle Bits
-                if (_settings.ShowCheers && twitchMessage.Tags.ContainsKey("bits"))
-                {
-                    if (RegisterBits(twitchMessage.Tags["bits"]) )
-                    {                        
-                        var emoteName = "cheer" + twitchMessage.Tags["bits"];
-                        var bitsMessage = twitchMessage.Tags["bits"] + " bits";
-                        
-                        var notice = $":Twitch!Twitch@Twitch.tv NOTICE {twitchMessage.Channel} :{twitchMessage.UserName} {emoteName} just cheered for {bitsMessage}! {emoteName}";
-                        _twitchServer.SendFakeRaw(notice);
-                    }
-                }
-
-
-                //Rewrite nicknames to include badges
-                if (_settings.ShowBadges && twitchMessage.HasBadges)
-                {
-                    //eat the message 
-                    rawDataArgs.Bytes = null;
-
-                    var newName = twitchMessage.BadgeList + twitchMessage.UserName ;
-                    dataString = dataString.Replace($":{twitchMessage.UserName}!", $":{newName}!");
-
-                    _twitchServer.SendFakeRaw(dataString);
-                }                
-                return;
+                i = 0;
             }
 
-            //Redirect notices to proper channel tab
-            if (dataString.Contains("NOTICE "))
+            //If the text behind the cusor matches autocomplete inserted text, set i back by that much
+            var iOffset = i - wordSuffix.Length;
+            if (iOffset > 0)
             {
-                //Check if its a usable notiec message
-                var noticeRegex = @".+ :tmi.twitch.tv NOTICE (#.+) :(.+)";
-                var noticeMatch = Regex.Match(dataString, noticeRegex);
+                var subString = text.Substring(iOffset + 1, wordSuffix.Length);
 
-                if (noticeMatch.Success)
+                //Adjust backwards the length of the suffix
+                if (subString == wordSuffix)
                 {
-                    var channel = noticeMatch.Groups[1].ToString();
-                    var message = noticeMatch.Groups[2].ToString();
-
-                    //Send a fake regular irc notice instead
-                    
-                    var notice = $":Twitch!Twitch@Twitch.tv NOTICE {channel} :{message}";
-                    _twitchServer.SendFakeRaw(notice);
-
-                    //Eat message.
-                    rawDataArgs.Bytes = null;
-                    return;
+                    i = iOffset;
+                    startIndex -= wordSuffix.Length;
                 }
             }
 
-            //Handle timeout/ban messages
-            if (dataString.Contains("CLEARCHAT ") )
+            //Search backwards to find the end of the current word.
+            while (text[i] != ' ' && i > 0)
             {
-                rawDataArgs.Bytes = null;
-
-                if (!_settings.ShowTimeouts)
-                    return;
-
-                var clearChatRegex = @"@ban-duration=(.*?);ban-reason=(.*?);.+ :tmi.twitch.tv CLEARCHAT (#.+) :(.+)";
-                var clearChatMatch = Regex.Match(dataString, clearChatRegex);
-
-                if (clearChatMatch.Success)
-                {
-                    var channel = clearChatMatch.Groups[3].ToString();
-                    var message = clearChatMatch.Groups[2].ToString().Replace("\\s"," ");
-                    var time = clearChatMatch.Groups[1].ToString();
-                    var target = clearChatMatch.Groups[4].ToString();
-
-                    if (string.IsNullOrEmpty(time))
-                        time = "∞";
-
-                    if (string.IsNullOrEmpty(message))
-                        message = "No Reason Given";
-
-                    var notice = $":Twitch!Twitch@Twitch.tv NOTICE {channel} :{target} was banned: {message} [ {time} seconds ]";
-                    _twitchServer.SendFakeRaw(notice);
-
-                    return;
-                }                
+                i--;
             }
 
-            //Handle resubscriptions
-            if (dataString.Contains("USERNOTICE "))
+            //Offset one if its not the start of the text, don't want to include the spaces we searched for
+            if (i != 0)
             {
-                rawDataArgs.Bytes = null;
-
-                if (!_settings.ShowSubs)
-                    return;
-
-                var subRegexMessage = @"system-msg=(.*?);.*USERNOTICE (#.+) :(.*)";
-                var subRegexNoMessage = @"system-msg=(.*?);.*USERNOTICE (#.+)";
-
-                var subMessageMatch = Regex.Match(dataString, subRegexMessage);
-                var subNoMessageMatch = Regex.Match(dataString, subRegexNoMessage);
-                
-                if (subMessageMatch.Success)
-                {
-                    var channel = subMessageMatch.Groups[2].ToString();
-                    var systemMessage = subMessageMatch.Groups[1].ToString();
-                    var userMessage = subMessageMatch.Groups[3].ToString();
-
-                    systemMessage = systemMessage.Replace("\\s", " ");
-
-                    var notice = $":Twitch!Twitch@Twitch.tv NOTICE {channel} :{systemMessage} [ {userMessage} ]";                    
-                    _twitchServer.SendFakeRaw(notice);
-                }else if (subNoMessageMatch.Success)
-                {
-                    var channel = subNoMessageMatch.Groups[2].ToString();
-                    var systemMessage = subNoMessageMatch.Groups[1].ToString();
-
-                    systemMessage = systemMessage.Replace("\\s", " ");
-
-                    var notice = $":Twitch!Twitch@Twitch.tv NOTICE {channel} :{systemMessage}";                    
-                    _twitchServer.SendFakeRaw(notice);
-                }
+                i++;
             }
 
-            if (dataString.Contains("ROOMSTATE ") || dataString.Contains("USERSTATE ") || dataString.Contains("CLEARCHAT ") || dataString.Contains("HOSTTARGET "))
-            {
-                //Silently eat these messages and do nothing. They only cause empty * lines to appear in the server tab and Twitch@AdiIRC does not use them
-                rawDataArgs.Bytes = null;
-            }                                    
+            return Tuple.Create(i, startIndex);
         }
 
         private void TopicUpdate()
         {
-            if (CheckTwitchServer() == false)
-                return;
+            //Find any twitch server connections in the serverlist. there might be
+            //more than one and there might be none so storing it statically is impractical
+            foreach (IServer server in _host.GetServers)
+            {
+                if (IsTwitchServer(server))
+                {
+                    var channels = server.GetChannels;
 
-            var channels = _twitchServer.GetChannels;
-            
-            foreach (IChannel channel in channels)
-            {                
-                try
-                {
-                    var channelName = channel.Name.TrimStart('#');
-                    var newTopic = TwitchApiTools.GetSimpleChannelInformationByName(channelName);
-                    if (channel.Topic != newTopic)
+                    //Iterate over all channels, updating the topic.
+                    foreach (IChannel channel in channels)
                     {
-                        var topicMessage = $":Twitch!Twitch@Twitch.tv TOPIC #{channelName} :{newTopic}";
-                        _twitchServer.SendFakeRaw(topicMessage);
+                        string topicData;
+                        var userName = channel.Name.TrimStart('#');
+
+                        //TwitchApiTools connects to the web, disk or web IO is unreliable 
+                        //so handle it in a try / catch block
+                        try
+                        {                           
+                            topicData = TwitchApiTools.GetSimpleChannelInformationByName(userName);
+                        }
+                        catch (Exception)
+                        {
+                            topicData = $"Twitch@AdiIRC: Could not find channel topic data for {userName}.";                            
+                        }
+
+                        //AdiIRC will let you set a topic to the same thing, this avoids repetitive topic updates. 
+                        if (channel.Topic != topicData)
+                        {
+                            var topicMessage = $":Twitch!Twitch@Twitch.tv TOPIC #{userName} :{topicData}";
+                            server.SendFakeRaw(topicMessage);
+                        }
                     }
-                }
-                catch (Exception)
-                {
-                    Host.SendCommand(_twitchServer, ".echo", "Error updating channel topics.");
-                    return;
                 }
             }
         }
 
         public void RegisterEmote(TwitchEmote emote)
         {
+            var window = _host.ActiveIWindow;            
+            
+            //Check if we've already added this emote
             if (_handledEmotes.Contains(emote.Name))
                 return;
-
-            var emoteFile = $"{_emoteDirectory}\\{emote.Id}.png";
-
+            
+            var emoteDirectory = _host.ConfigFolder + @"\TwitchEmotes";            
+            var emoteFile = $"{emoteDirectory}\\{emote.Id}.png";
+            
+            //Check if we've already downloaded this emote earlier, if so just 
+            //add the existing file.
             if (File.Exists(emoteFile))
-            {
-                
-                //Actually register the emote with AdiIRC
-                var command = $"Emoticons Emoticon_{emote.Name} {emoteFile}";
-                Host.SendCommand(_twitchServer, ".setoption", command);
+            {                
+                //ExecuteCommand executes a scripting command like you entered 
+                //into the window ExecteCommand is being invoked on. 
+                //https://dev.adiirc.com/projects/adiirc/wiki/Scripting_Commands
 
+                //AdiIRC will supress the output of a slashcommand if its 
+                //instead invoked with a starting .
+
+                //Setoption is a slash command to add or change options in the .ini file
+                //https://dev.adiirc.com/projects/adiirc/wiki/Setoption
+                var command = $".setoption Emoticons Emoticon_{emote.Name} {emoteFile}";
+                window.ExecuteCommand(command);                
                 _handledEmotes.Add(emote.Name);
                 return;
             }
-
-            if (DownloadEmote(emote))
+            
+            //Try to download the emote, then add it
+            if (emote.DownloadEmote(emoteFile))
             {
-                //Actually register the emote with AdiIRC
-                var command = $"Emoticons Emoticon_{emote.Name} {emoteFile}";
-                Host.SendCommand(_twitchServer, ".setoption", command);                
-
+                //See above              
+                var command = $".setoption Emoticons Emoticon_{emote.Name} {emoteFile}";
+                window.ExecuteCommand(command);                
                 _handledEmotes.Add(emote.Name);
-            }
-        }
-
-        public void RegisterEmotes(IEnumerable<TwitchEmote> emotes)
-        {
-            foreach (var emote in emotes)
-            {
-                RegisterEmote(emote);
-            }
+            }            
         }
 
         public bool RegisterBits(string bitCount)
         {
+            var window = _host.ActiveIWindow;
+
             if (string.IsNullOrEmpty(bitCount))
                 return false;
-            
-            var emoteName = "cheer" + bitCount;
 
-            if (_handledEmotes.Contains(emoteName))
+            //Create a new Bit, its basically the same idea as an emote with slightly different specifics
+            var bit = new TwitchBit{Amount = bitCount};
+
+
+            var emoteDirectory = _host.ConfigFolder + @"\TwitchEmotes";
+            var emoteFile = $"{emoteDirectory}\\{bit.Name}.png";
+
+            //Already registered this bit earlyier
+            if (_handledEmotes.Contains(bit.Name))
                 return true;
 
-            var emoteFile = $"{_emoteDirectory}\\{emoteName}.png";
-
+            //Check if we've already downloaded this bit earlier, if so just 
+            //add the existing file.
             if (File.Exists(emoteFile))
             {
-                //Actually register the emote with AdiIRC
-                var command = $"Emoticons Emoticon_{emoteName} {emoteFile}";
-                Host.SendCommand(_twitchServer, ".setoption", command);
+                //ExecuteCommand executes a scripting command like you entered 
+                //into the window ExecteCommand is being invoked on. 
+                //https://dev.adiirc.com/projects/adiirc/wiki/Scripting_Commands
 
-                _handledEmotes.Add(emoteName);
+                //AdiIRC will supress the output of a slashcommand if its 
+                //instead invoked with a starting .
+
+                //Setoption is a slash command to add or change options in the .ini file
+                //https://dev.adiirc.com/projects/adiirc/wiki/Setoption
+                var command = $".setoption Emoticons Emoticon_{bit.Name} {emoteFile}";
+                window.ExecuteCommand(command);
+                _handledEmotes.Add(bit.Name);
                 return true;
             }
-            
-            if (DownloadBits(bitCount))
-            {
-                //Actually register the emote with AdiIRC                
-                var command = $"Emoticons Emoticon_{emoteName} {emoteFile}";
-                Host.SendCommand(_twitchServer, ".setoption", command);
 
-                _handledEmotes.Add(emoteName);
+            //Try to download the emote, then add it
+            if (bit.DownloadBit(emoteFile))
+            {
+                //See above              
+                var command = $".setoption Emoticons Emoticon_{bit.Name} {emoteFile}";
+                window.ExecuteCommand(command);
+                _handledEmotes.Add(bit.Name);
                 return true;
             }
 
             return false;
         }
 
-        private bool CheckTwitchServer()
+        private bool IsTwitchServer(IServer server)
         {
-            if (_twitchServer != null)
-            {
-                if (_twitchServer.Network.ToLower().Contains("twitch"))
-                {                    
-                    return true;
-                }
-            }
-
-            foreach (var server in ((IEnumerable<IServer>)Host.GetServers))
-            {
-                if (server.Network.ToLower().Contains("twitch"))
-                {
-                    _twitchServer = server;
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private bool DownloadEmote(TwitchEmote emote)
-        {
-            var filePath = $"{_emoteDirectory}\\{emote.Id}.png";
-
-            try
-            {
-                WebClient wc = new WebClient();                
-                wc.DownloadFile(emote.URL, filePath);
-            }
-            catch (Exception)
-            {                
-                return false;
-            }
-
-            return true;
-        }
-
-        private bool DownloadBits(string bitCount)
-        {
-            var emoteName = "cheer" + bitCount;
-            var filePath = $"{_emoteDirectory}\\{emoteName}.png";
-            var color = "gray";
-
-            try
-            {
-                var ibitCount = int.Parse(bitCount);
-                if (ibitCount > 10000)
-                {
-                    color = "red";
-                }else if (ibitCount > 5000)
-                {
-                    color = "blue";
-                }else if (ibitCount > 1000)
-                {
-                    color = "green";
-                }else if (ibitCount > 100)
-                {
-                    color = "purple";
-                }
-            }
-            catch (Exception)
-            {
-                return false;                
-            }
-
-
-            var url = $"https://static-cdn.jtvnw.net/bits/light/static/{color}/1";
-
-            try
-            {
-                WebClient wc = new WebClient();
-                wc.DownloadFile(url, filePath);
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-
-            return true;
+            return server != null &&
+                   server.Network.ToLower().Contains("twitch") 
+                   && server.NetworkLabel.ToLower().Contains("twitch");
         }
 
         public void Dispose()

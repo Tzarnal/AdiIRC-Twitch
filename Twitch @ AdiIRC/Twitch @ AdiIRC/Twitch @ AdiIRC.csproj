@@ -30,9 +30,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="AdiIRCAPI, Version=1.3.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\Libraries\AdiIRCAPI.dll</HintPath>
+    <Reference Include="AdiIRCAPIv2">
+      <HintPath>C:\Users\moonw\AppData\Local\AdiIRC\AdiIRCAPIv2.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=9.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.9.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
@@ -62,8 +61,10 @@
     <Compile Include="TwitchApi\Channel.cs" />
     <Compile Include="TwitchApi\TwitchApiTools.cs" />
     <Compile Include="TwitchApi\Users.cs" />
+    <Compile Include="TwitchBit.cs" />
     <Compile Include="TwitchEmote.cs" />
     <Compile Include="TwitchIrcMessage.cs" />
+    <Compile Include="TwitchRawEventHandlers.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

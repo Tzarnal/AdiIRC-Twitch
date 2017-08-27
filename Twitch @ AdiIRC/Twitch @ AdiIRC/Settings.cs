@@ -1,50 +1,68 @@
 ﻿using System;
 using System.IO;
+using System.Windows.Forms;
 using Newtonsoft.Json;
 
 namespace Twitch___AdiIRC
 {
     public class Settings
     {
-        public static string DataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) +
-                                        @"\AdiIRC\Plugins\TwitchConfig\";
-        public static string DataFileName = "Config.json";
+        public string Path;
 
-        public bool ShowTimeouts=true;
-        public bool ShowCheers=true;
-        public bool ShowSubs=true;
-        public bool ShowBadges=true;
-        
-        public static string FullPath
-        {
-            get { return DataPath + DataFileName; }
-
-        }
+        public bool ShowTimeouts = true;
+        public bool ShowCheers = true;
+        public bool ShowSubs = true;
+        public bool ShowBadges = true;
+        public bool AutoComplete = true;
 
         public void Save()
         {
             var data = JsonConvert.SerializeObject(this);
+            var configFolder = System.IO.Path.GetDirectoryName(Path);
 
-            if (!Directory.Exists(DataPath))
+            if (!string.IsNullOrWhiteSpace(configFolder) && !Directory.Exists(configFolder))
             {
-                Directory.CreateDirectory(DataPath);
+                Directory.CreateDirectory(configFolder);
             }
 
             try
             {
-                File.WriteAllText(FullPath, data);
+                File.WriteAllText(Path, data);
             }
             catch (Exception)
-            {                
+            {
+                MessageBox.Show($"Could not write to AdiIRC@Twich's config file ({Path})");
             }
-
         }
 
-        public static Settings Load()
+        public static Settings Load(string path)
         {
-            var data = File.ReadAllText(FullPath);
-            return JsonConvert.DeserializeObject<Settings>(data);
+            string data;
 
+            try
+            {
+                data = File.ReadAllText(path);
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show($"Could not read from AdiIRC@Twich's config file. Using Default Values.");
+                return new Settings();
+            }
+
+            Settings settings;
+
+            try
+            {
+                settings = JsonConvert.DeserializeObject<Settings>(data);
+            }
+            catch (Exception)
+            {
+                MessageBox.Show($"Could not understand AdiIRC@Twich's config file. Using Default Values.");
+                return new Settings();
+            }
+
+            settings.Path = path;
+            return settings;
         }
     }
 }
