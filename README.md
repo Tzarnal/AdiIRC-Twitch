@@ -5,14 +5,15 @@ This is a .net plugin for AdiIRC.
 Twitch @ AdiIRC aims to add improvements for using twitch chat through AdiIRC. 
 
 * Adds Twitch Emote support
-* Some simple configuration options accesible through /twitch@
+* Some simple configuration options accesible through /twitch@ or the Commands menu
 * Displays Cheers in chat
 * Updates the channel topic with the game and status of the twitch channel periodicly
 * Displays channels state changes such as slow mode, subscriber mode etc properly in channels
 * Shows timeouts/bans as they happen. But does not clear chat.
 * Shows Subscriptions, Resubscriptions, Prime Subscriptions, etc.
-* Shows Twitch Badges such as Broadcaster, Moderator, Subscriber etc as part of irc Username.
+* Shows Twitch Badges such as Broadcaster, Moderator, Subscriber etc as part of irc Username
 * Cleans up the server tab spam
+* Supports twitch Whispers through normal Query / Private message interface
 
 Usage
 =============
