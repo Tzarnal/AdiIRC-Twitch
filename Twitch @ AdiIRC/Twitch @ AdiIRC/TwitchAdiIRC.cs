@@ -207,7 +207,7 @@ namespace Twitch___AdiIRC
             
             //Check if there are any emotes, if so iterate over them all and Register them.
             if (twitchMessage.HasEmotes)
-            {                
+            {                              
                 foreach (var emote in twitchMessage.Emotes)
                 {                    
                     RegisterEmote(emote);
@@ -518,7 +518,7 @@ namespace Twitch___AdiIRC
                 var command = $".setoption Emoticons Emoticon_{emote.Name} {emoteFile}";
                 window.ExecuteCommand(command);                
                 _handledEmotes.Add(emote.Name);
-            }            
+            }
         }
 
         public bool RegisterBits(string bitCount)
