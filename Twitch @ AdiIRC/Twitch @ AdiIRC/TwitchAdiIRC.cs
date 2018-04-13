@@ -261,7 +261,11 @@ namespace Twitch___AdiIRC
         }
 
         private void OnMenu(MenuEventArgs argument)
-        {                                    
+        {
+            //early return in case argument is null 
+            if (argument == null)
+                return;
+            
             //The plugin should only add its config menu too relevant entries, 
             //it makes no sense to add it to say the rightclick menu of a link
             //For now that means the Commands menu and the rightclick menu of the twitch Server windows.
