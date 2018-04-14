@@ -8,7 +8,7 @@ namespace Twitch___AdiIRC
     {
         public string Amount;
         public string Name => $"cheer{Amount}";       
-        public string URL => $"https://static-cdn.jtvnw.net/bits/light/static/{Color}/1";
+        public string URL => $"http://static-cdn.jtvnw.net/bits/light/static/{Color}/1";
 
         public string Color
         {
