@@ -261,26 +261,33 @@ namespace Twitch___AdiIRC
         }
 
         private void OnMenu(MenuEventArgs argument)
-        {
-            //early return in case argument is null 
-            if (argument == null)
+        {            
+            //Query windows have a null window, break early on these
+            if (argument.Window == null)
+            {
                 return;
-            
+            }
+
             //The plugin should only add its config menu too relevant entries, 
             //it makes no sense to add it to say the rightclick menu of a link
             //For now that means the Commands menu and the rightclick menu of the twitch Server windows.
             if ( (IsTwitchServer(argument.Window.Server) && argument.MenuType == MenuType.Server) || argument.MenuType == MenuType.Menubar)
-            {
+            {                
                 var menuItems = argument.MenuItems;
 
+                if (menuItems == null)
+                {
+                    return;
+                }
+             
                 var toolStripMenuItem = new ToolStripMenuItem("Twitch@AdiIRC");
                 toolStripMenuItem.Click += delegate {
                     _settingsForm.Show();
                 };
-
+             
                 menuItems.Add(new ToolStripSeparator());
                 menuItems.Add(toolStripMenuItem);
-            }
+            }            
         }
 
         private void OnCommand(RegisteredCommandArgs argument)
