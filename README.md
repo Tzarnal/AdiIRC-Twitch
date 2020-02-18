@@ -1,3 +1,7 @@
+Unsuported
+=============
+I've stopped using irc in general and as such I'm no longer supporting this plugin.
+
 Twitch @ AdiRC
 =============
 This is a .net plugin for AdiIRC.
